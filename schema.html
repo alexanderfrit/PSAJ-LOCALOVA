@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce Database Schema</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            padding: 2rem;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #333;
+        }
+
+        .schema {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .table-header {
+            background: #2563eb;
+            color: white;
+            padding: 1rem;
+            font-weight: bold;
+        }
+
+        .table-content {
+            padding: 1rem;
+        }
+
+        .field {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .field:last-child {
+            border-bottom: none;
+        }
+
+        .field-name {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .field-type {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .key {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-left: 0.5rem;
+        }
+
+        .pk {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .fk {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .relationships {
+            margin-top: 2rem;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .relationship {
+            padding: 0.5rem 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>E-commerce Database Schema</h1>
+        
+        <div class="schema">
+            <!-- User Table -->
+            <div class="table">
+                <div class="table-header">User</div>
+                <div class="table-content">
+                    <div class="field">
+                        <span class="field-name">id<span class="key pk">PK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">email</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">password</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">name</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">role</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">createdAt</span>
+                        <span class="field-type">datetime</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Table -->
+            <div class="table">
+                <div class="table-header">Product</div>
+                <div class="table-content">
+                    <div class="field">
+                        <span class="field-name">id<span class="key pk">PK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">name</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">price</span>
+                        <span class="field-type">float</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">description</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">imageURL</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">category</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">stock</span>
+                        <span class="field-type">integer</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Table -->
+            <div class="table">
+                <div class="table-header">Order</div>
+                <div class="table-content">
+                    <div class="field">
+                        <span class="field-name">id<span class="key pk">PK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">userId<span class="key fk">FK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">orderAmount</span>
+                        <span class="field-type">float</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">orderStatus</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">orderDate</span>
+                        <span class="field-type">datetime</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">paymentMethod</span>
+                        <span class="field-type">string</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OrderItem Table -->
+            <div class="table">
+                <div class="table-header">OrderItem</div>
+                <div class="table-content">
+                    <div class="field">
+                        <span class="field-name">id<span class="key pk">PK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">orderId<span class="key fk">FK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">productId<span class="key fk">FK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">quantity</span>
+                        <span class="field-type">integer</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">price</span>
+                        <span class="field-type">float</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ShippingAddress Table -->
+            <div class="table">
+                <div class="table-header">ShippingAddress</div>
+                <div class="table-content">
+                    <div class="field">
+                        <span class="field-name">id<span class="key pk">PK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">orderId<span class="key fk">FK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">name</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">line1</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">line2</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">city</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">country</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">phone</span>
+                        <span class="field-type">string</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Review Table -->
+            <div class="table">
+                <div class="table-header">Review</div>
+                <div class="table-content">
+                    <div class="field">
+                        <span class="field-name">id<span class="key pk">PK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">userId<span class="key fk">FK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">productId<span class="key fk">FK</span></span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">rating</span>
+                        <span class="field-type">integer</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">comment</span>
+                        <span class="field-type">string</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-name">createdAt</span>
+                        <span class="field-type">datetime</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="relationships">
+            <h2>Relationships</h2>
+            <div class="relationship">• User (1) → Order (Many): A user can have multiple orders</div>
+            <div class="relationship">• User (1) → Review (Many): A user can write multiple reviews</div>
+            <div class="relationship">• Product (1) → Review (Many): A product can have multiple reviews</div>
+            <div class="relationship">• Order (1) → OrderItem (Many): An order can have multiple items</div>
+            <div class="relationship">• Order (1) → ShippingAddress (1): An order has one shipping address</div>
+            <div class="relationship">• Product (1) → OrderItem (Many): A product can be in multiple order items</div>
+        </div>
+    </div>
+</body>
+</html> 
