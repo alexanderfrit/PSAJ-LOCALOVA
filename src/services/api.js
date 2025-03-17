@@ -1,7 +1,7 @@
-const API_URL = 'https://us-central1-umkm-92d73.cloudfunctions.net/api';
+import { ENDPOINTS } from '../config/apiConfig';
 
 export const createPayment = async (data) => {
-  const response = await fetch(`${API_URL}/api/create-payment`, {
+  const response = await fetch(ENDPOINTS.CREATE_PAYMENT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

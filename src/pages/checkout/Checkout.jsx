@@ -10,6 +10,7 @@ import { saveOrder } from "../../utils/saveOrder";
 import { motion } from "framer-motion";
 import { RiShoppingBagLine, RiSecurePaymentLine } from "react-icons/ri";
 import { toastConfig } from "../../utils/toastConfig";
+import { createPayment } from "../../services/api";
 
 const Checkout = () => {
 	const { cartItems, totalAmount } = useSelector((store) => store.cart);
@@ -27,21 +28,16 @@ const Checkout = () => {
 	const handlePayment = async () => {
 		try {
 			setIsLoading(true);
-			const response = await fetch('http://localhost:5000/api/create-payment', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					orderItems: cartItems,
-					totalAmount,
-					userEmail: email,
-					shippingAddress,
-					orderId: `ORDER-${Date.now()}`
-				}),
+			
+			const response = await createPayment({
+				orderItems: cartItems,
+				totalAmount,
+				userEmail: email,
+				shippingAddress,
+				orderId: `ORDER-${Date.now()}`
 			});
 
-			const { token } = await response.json();
+			const { token } = response;
 			
 			window.snap.pay(token, {
 				onSuccess: async function(result) {
