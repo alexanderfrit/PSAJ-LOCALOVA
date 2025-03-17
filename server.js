@@ -6,7 +6,13 @@ const midtransClient = require('midtrans-client');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+const corsOptions = {
+	origin: process.env.FRONTEND_URL || 'https://psaj-localova.vercel.app',
+	optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 // Production setup
 if (process.env.NODE_ENV === "production") {
