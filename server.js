@@ -8,7 +8,7 @@ const app = express();
 
 // CORS configuration
 const corsOptions = {
-	origin: process.env.FRONTEND_URL || 'https://psaj-localova.vercel.app',
+	origin: 'https://psaj-localova.vercel.app',
 	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 	credentials: true,
 	optionsSuccessStatus: 200
