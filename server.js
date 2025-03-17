@@ -5,14 +5,18 @@ const path = require("path");
 const midtransClient = require('midtrans-client');
 
 const app = express();
-app.use(express.json());
 
+// CORS configuration
 const corsOptions = {
 	origin: process.env.FRONTEND_URL || 'https://psaj-localova.vercel.app',
+	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+	credentials: true,
 	optionsSuccessStatus: 200
 };
 
+// Apply middlewares
 app.use(cors(corsOptions));
+app.use(express.json());
 
 // Production setup
 if (process.env.NODE_ENV === "production") {
