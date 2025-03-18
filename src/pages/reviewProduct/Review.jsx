@@ -21,7 +21,7 @@ const Review = () => {
 	const [rating, setRating] = useState(0);
 	const [review, setReview] = useState("");
 	const navigate = useNavigate();
-	const { id } = useParams();
+	const { id, orderId } = useParams();
 	const { products } = useSelector((store) => store.product);
 	const { userId, userName, userPhoto } = useSelector((store) => store.auth);
 
@@ -40,6 +40,7 @@ const Review = () => {
 			// Only include userPhoto if it exists, otherwise use null
 			...(userPhoto ? { userPhoto } : { userPhoto: null }),
 			productId: id,
+			orderId: orderId,
 			review,
 			rating,
 			reviewDate: date,

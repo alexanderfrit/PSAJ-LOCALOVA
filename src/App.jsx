@@ -36,7 +36,7 @@ const App = () => {
         />
         <Route path="/order-details/:id" element={<OrderDetails />} />
         <Route
-          path="/review-product/:id"
+          path="/review-product/:id/:orderId"
           element={
             <ProtectedRoute>
               <Review />

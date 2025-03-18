@@ -1,12 +1,44 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { formatPrice } from "../../utils/formatPrice";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { RiArchiveLine, RiTruckLine, RiShieldCheckLine, RiStarLine, RiExternalLinkLine } from "react-icons/ri";
+import { RiArchiveLine, RiTruckLine, RiShieldCheckLine, RiStarLine, RiExternalLinkLine, RiCheckLine } from "react-icons/ri";
 import { TbTruckDelivery } from "react-icons/tb";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../../firebase/config"; // Adjust path as needed
+import { useSelector } from "react-redux";
 
 const OrdersComponent = ({ orders, user, admin }) => {
 	const navigate = useNavigate();
+	const { user: reduxUser } = useSelector((state) => state.auth); // Make sure you have the user data
+	const [reviewedProducts, setReviewedProducts] = useState({});
+	
+	// Fetch already reviewed products
+	useEffect(() => {
+		const fetchReviewedProducts = async () => {
+			if (!reduxUser) return;
+			
+			try {
+				const reviewsRef = collection(db, "reviews");
+				const q = query(reviewsRef, where("userId", "==", reduxUser.uid));
+				const querySnapshot = await getDocs(q);
+				
+				const reviewed = {};
+				querySnapshot.forEach(doc => {
+					const reviewData = doc.data();
+					// Create a unique key for each order-product combination
+					const key = `${reviewData.orderId}-${reviewData.productId}`;
+					reviewed[key] = true;
+				});
+				
+				setReviewedProducts(reviewed);
+			} catch (error) {
+				console.error("Error fetching reviewed products:", error);
+			}
+		};
+		
+		fetchReviewedProducts();
+	}, [reduxUser]);
 
 	function handleUserClick(orderId) {
 		navigate(`/order-details/${orderId}`);
@@ -15,12 +47,12 @@ const OrdersComponent = ({ orders, user, admin }) => {
 		navigate(`/admin/order-details/${orderId}`);
 	}
 	
-	function handleReviewClick(e, productIds) {
+	function handleReviewClick(e, productIds, orderId) {
 		e.stopPropagation(); // Prevent triggering the order click
-		// Navigate to review page with the first product
-		if (productIds && productIds.length > 0) {
-			navigate(`/review-product/${productIds[0]}`);
-		}
+		// Navigate to review page for the first product in the order
+		// You might want to modify this to allow choosing which product to review
+		const productToReview = productIds[0];
+		navigate(`/review-product/${productToReview}/${orderId}`);
 	}
 
 	const getStatusIcon = (status) => {
@@ -81,6 +113,11 @@ const OrdersComponent = ({ orders, user, admin }) => {
 						// Check if order is delivered - this enables review functionality
 						const isDelivered = orderStatus === "Item(s) Delivered" || orderStatus === "Delivered";
 						
+						// Check if all products in this order have been reviewed
+						const allProductsReviewed = productIds.every(productId => 
+							reviewedProducts[`${id}-${productId}`]
+						);
+						
 						return (
 							<motion.section
 								key={index}
@@ -139,16 +176,36 @@ const OrdersComponent = ({ orders, user, admin }) => {
 									
 									{/* Review button - only show for delivered orders and for users (not admin) */}
 									{user && isDelivered && (
-										<div className="pt-4 border-t border-base-300 flex justify-end">
-											<motion.button
-												whileTap={{ scale: 0.98 }}
-												onClick={(e) => handleReviewClick(e, productIds)}
-												className="flex items-center gap-2 bg-primary text-white px-4 py-2 text-sm transition-all hover:bg-primary-focus"
-											>
-												<RiStarLine className="w-4 h-4" />
-												Write a Review
-												<RiExternalLinkLine className="w-4 h-4" />
-											</motion.button>
+										<div className="pt-4 border-t border-base-300 flex justify-between">
+											{allProductsReviewed ? (
+												<div className="flex items-center text-green-600 text-sm">
+													<RiCheckLine className="w-4 h-4 mr-1" />
+													All items in this order have been reviewed
+												</div>
+											) : (
+												<div>
+													{productIds.some(productId => reviewedProducts[`${id}-${productId}`]) && (
+														<span className="text-sm text-neutral/60">
+															Some items in this order have been reviewed
+														</span>
+													)}
+												</div>
+											)}
+											
+											{!allProductsReviewed && (
+												<motion.button
+													whileTap={{ scale: 0.98 }}
+													onClick={(e) => handleReviewClick(e, productIds, id)}
+													className="flex items-center gap-2 bg-primary text-white px-4 py-2 text-sm transition-all hover:bg-primary-focus"
+												>
+													<RiStarLine className="w-4 h-4" />
+													{productIds.some(productId => reviewedProducts[`${id}-${productId}`]) 
+														? "Review Remaining Items" 
+														: "Write a Review"
+													}
+													<RiExternalLinkLine className="w-4 h-4" />
+												</motion.button>
+											)}
 										</div>
 									)}
 								</div>
