@@ -6,7 +6,6 @@ const midtransClient = require('midtrans-client');
 const multer = require('multer');
 const axios = require('axios');
 const tf = require('@tensorflow/tfjs');
-const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
 const sharp = require('sharp');
 require('@tensorflow/tfjs-backend-cpu');
@@ -72,16 +71,27 @@ async function imageToTensor(imageBuffer) {
 		// Resize image to 224x224 (MobileNet input size)
 		const resizedImageBuffer = await sharp(imageBuffer)
 			.resize(224, 224)
-			.toBuffer();
+			.removeAlpha()  // Ensure it's RGB (3 channels)
+			.raw()
+			.toBuffer({ resolveWithObject: true });
 		
-		// Convert to tensor
-		const uint8Array = new Uint8Array(resizedImageBuffer);
-		const decodedImage = tf.node.decodeImage(uint8Array, 3);
+		// Get dimensions and data
+		const { data, info } = resizedImageBuffer;
+		const { width, height, channels } = info;
 		
-		// Normalize and expand dimensions
-		const normalized = decodedImage.toFloat().div(tf.scalar(255)).expandDims();
+		// Create tensor directly from raw pixel data
+		const pixelData = new Float32Array(width * height * channels);
 		
-		decodedImage.dispose(); // Clean up
+		// Convert to float32 and normalize
+		for (let i = 0; i < data.length; i++) {
+			pixelData[i] = data[i] / 255.0;
+		}
+		
+		// Create tensor with proper shape for MobileNet
+		const tensor = tf.tensor3d(pixelData, [height, width, channels]);
+		const normalized = tensor.expandDims(0);
+		
+		tensor.dispose(); // Clean up
 		
 		return normalized;
 	} catch (error) {
@@ -276,6 +286,37 @@ async function findSimilarProducts(products, searchFeatures, limit, threshold) {
 			similarity: item.similarity.toFixed(2)
 		}));
 }
+
+// Simple proxy endpoint that doesn't use TensorFlow on server
+app.post('/api/search/url/simple', async (req, res) => {
+	try {
+		const { imageUrl } = req.body;
+		
+		if (!imageUrl) {
+			return res.status(400).json({ error: 'Image URL is required' });
+		}
+		
+		// Get products from your database
+		const { firestore, collection, getDocs } = require('firebase/firestore');
+		const productsCollection = collection(firestore, 'products');
+		const productsSnapshot = await getDocs(productsCollection);
+		const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+		
+		// Return all products and let frontend handle similarity
+		res.json({ 
+			imageUrl,
+			products: products.map(p => ({
+				id: p.id,
+				name: p.name,
+				price: p.price,
+				imageURL: p.imageURL
+			}))
+		});
+	} catch (error) {
+		console.error('Error in simple image search:', error);
+		res.status(500).json({ error: error.message || 'Failed to process request' });
+	}
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
