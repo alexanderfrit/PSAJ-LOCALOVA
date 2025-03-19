@@ -295,6 +295,7 @@ async function findSimilarProducts(products, searchFeatures, limit, threshold) {
 			name: item.product.name,
 			price: item.product.price,
 			imageURL: item.product.imageURL,
+			productURL: `https://psaj-localova.vercel.app/product-details/${item.product.id}`,
 			similarity: item.similarity.toFixed(2)
 		}));
 }
@@ -320,7 +321,8 @@ app.post('/api/search/url/simple', async (req, res) => {
 				id: p.id,
 				name: p.name,
 				price: p.price,
-				imageURL: p.imageURL
+				imageURL: p.imageURL,
+				productURL: `https://psaj-localova.vercel.app/product-details/${p.id}`
 			}))
 		});
 	} catch (error) {
