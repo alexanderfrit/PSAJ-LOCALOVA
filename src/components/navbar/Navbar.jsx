@@ -256,9 +256,13 @@ const Navbar = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute right-0 mt-2 w-[360px] bg-white shadow-xl border border-base-300"
+                    className="absolute right-0 mt-2 w-[280px] sm:w-[340px] md:w-[360px] bg-white shadow-xl border border-base-300 max-h-[80vh] overflow-auto"
+                    style={{ 
+                      maxWidth: "calc(100vw - 32px)",
+                      right: "-8px"
+                    }}
                   >
-                    <div className="p-6">
+                    <div className="p-4 sm:p-6">
                       {/* Cart Header */}
                       <div className="flex justify-between items-center border-b border-base-300 pb-4">
                         <h3 className="font-medium text-neutral">Shopping Cart</h3>
@@ -273,7 +277,7 @@ const Navbar = () => {
                         </div>
                       ) : (
                         <>
-                          <div className="py-4 max-h-[60vh] overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
+                          <div className="py-4 max-h-[50vh] overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-base-300 scrollbar-track-transparent">
                             {cartItems.map((item) => (
                               <motion.div
                                 key={item.id}
@@ -285,7 +289,7 @@ const Navbar = () => {
                                 {/* Product Image */}
                                 <Link 
                                   to={`/product-details/${item.id}`}
-                                  className="relative aspect-square w-20 bg-base-200/50 flex-shrink-0 overflow-hidden"
+                                  className="relative aspect-square w-16 sm:w-20 bg-base-200/50 flex-shrink-0 overflow-hidden"
                                   onClick={() => setIsCartOpen(false)}
                                 >
                                   <img 
@@ -327,20 +331,13 @@ const Navbar = () => {
                               </span>
                             </div>
 
-                            <div className="space-y-2">
+                            <div>
                               <Link 
                                 to="/cart"
                                 onClick={() => setIsCartOpen(false)}
-                                className="block w-full py-3 px-4 bg-neutral text-white hover:bg-primary transition-colors duration-200 text-center uppercase text-sm tracking-wider"
+                                className="block w-full py-3 px-4 bg-primary text-white hover:bg-primary-focus transition-colors duration-200 text-center uppercase text-sm tracking-wider"
                               >
                                 View Cart
-                              </Link>
-                              <Link 
-                                to="/checkout"
-                                onClick={() => setIsCartOpen(false)}
-                                className="block w-full py-3 px-4 border border-neutral text-neutral hover:bg-neutral hover:text-white transition-colors duration-200 text-center uppercase text-sm tracking-wider"
-                              >
-                                Checkout
                               </Link>
                             </div>
                           </div>
