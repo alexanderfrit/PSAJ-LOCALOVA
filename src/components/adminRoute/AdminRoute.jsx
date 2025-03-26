@@ -1,12 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
-
-// Helper function to check if user is admin
-const isAdmin = (email) => {
-  const adminEmails = import.meta.env.VITE_ADMIN_KEY?.split(',').map(email => email.trim()) || [];
-  return adminEmails.includes(email);
-};
+import { isAdmin } from "../../utils/adminUtils";
 
 const AdminRoute = ({ children }) => {
   const { email } = useSelector((store) => store.auth);

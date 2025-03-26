@@ -15,12 +15,7 @@ import { formatPrice } from "../../utils/formatPrice";
 import { motion, AnimatePresence } from "framer-motion";
 import LogoSvg from "../../assets/LocaLova.svg";
 import { toastConfig } from "../../utils/toastConfig";
-
-// Import the isAdmin helper function (you can also place it in a separate utility file)
-const isAdmin = (email) => {
-  const adminEmails = import.meta.env.VITE_ADMIN_KEY?.split(',').map(email => email.trim()) || [];
-  return adminEmails.includes(email);
-};
+import { isAdmin } from "../../utils/adminUtils";
 
 const Navbar = () => {
   const { isUserLoggedIn, userName, email } = useSelector((store) => store.auth);

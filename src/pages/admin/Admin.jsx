@@ -10,6 +10,7 @@ import {
 } from "../../components";
 import { RiMenuLine, RiCloseLine } from "react-icons/ri";
 import { motion, AnimatePresence } from "framer-motion";
+import AdminManagement from './AdminManagement';
 
 const Admin = () => {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -77,6 +78,7 @@ const Admin = () => {
 								<Route path="add-product/:id" element={<AddProducts />} />
 								<Route path="orders" element={<Orders />} />
 								<Route path="order-details/:id" element={<AdminOrderDetails />} />
+								<Route path="admin-management" element={<AdminManagement />} />
 							</Routes>
 						</div>
 					</div>
