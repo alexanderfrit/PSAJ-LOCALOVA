@@ -16,6 +16,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import LogoSvg from "../../assets/LocaLova.svg";
 import { toastConfig } from "../../utils/toastConfig";
 
+// Import the isAdmin helper function (you can also place it in a separate utility file)
+const isAdmin = (email) => {
+  const adminEmails = import.meta.env.VITE_ADMIN_KEY?.split(',').map(email => email.trim()) || [];
+  return adminEmails.includes(email);
+};
+
 const Navbar = () => {
   const { isUserLoggedIn, userName, email } = useSelector((store) => store.auth);
   const { totalAmount, totalQuantity, cartItems } = useSelector((store) => store.cart);
@@ -32,8 +38,8 @@ const Navbar = () => {
   const [navHistory, setNavHistory] = useState([]);
   const navigationType = useNavigationType();
 
-  // Check if user is admin
-  const isAdmin = email === import.meta.env.VITE_ADMIN_KEY;
+  // Check if user is admin - UPDATED VERSION
+  const userIsAdmin = isAdmin(email);
 
   const pathnames = location.pathname.split('/').filter((x) => x);
 
@@ -184,7 +190,7 @@ const Navbar = () => {
               Home
             </NavLink>
             
-            {isAdmin && (
+            {userIsAdmin && (
               <NavLink 
                 to="/admin/home"
                 className={({ isActive }) => `
@@ -488,7 +494,7 @@ const Navbar = () => {
                 Home
               </Link>
               
-              {isAdmin && (
+              {userIsAdmin && (
                 <Link 
                   to="/admin/home"
                   className="block py-2 text-neutral hover:text-primary transition-colors"

@@ -2,9 +2,17 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 
+// Helper function to check if user is admin
+const isAdmin = (email) => {
+  const adminEmails = import.meta.env.VITE_ADMIN_KEY?.split(',').map(email => email.trim()) || [];
+  return adminEmails.includes(email);
+};
+
 const AdminRoute = ({ children }) => {
   const { email } = useSelector((store) => store.auth);
-  if (email === import.meta.env.VITE_ADMIN_KEY) return children;
+  
+  if (isAdmin(email)) return children;
+  
   return (
     <section className="flex flex-col items-center justify-center w-full page gap-5">
       <h2 className="text-4xl font-bold">PERMISSION DENIED</h2>
@@ -18,7 +26,7 @@ const AdminRoute = ({ children }) => {
 
 export const AdminOnlyLink = ({ children }) => {
   const { email } = useSelector((store) => store.auth);
-  if (email === import.meta.env.VITE_ADMIN_KEY) return children;
+  if (isAdmin(email)) return children;
   return null;
 };
 
