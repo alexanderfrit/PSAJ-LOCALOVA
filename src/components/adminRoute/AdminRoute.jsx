@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RiComputerLine } from "react-icons/ri";
 import { motion } from "framer-motion";
+import { isAdmin } from "../../utils/adminUtils";
 
 const AdminRoute = ({ children }) => {
   const { email } = useSelector((store) => store.auth);
@@ -19,7 +20,7 @@ const AdminRoute = ({ children }) => {
   }, []);
 
   // First check if user is admin
-  if (email !== import.meta.env.VITE_ADMIN_KEY) {
+  if (!isAdmin(email)) {
     return (
       <section className="flex flex-col items-center justify-center w-full page gap-5">
         <h2 className="text-4xl font-bold">PERMISSION DENIED</h2>
@@ -85,7 +86,7 @@ export const AdminOnlyLink = ({ children }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  if (email === import.meta.env.VITE_ADMIN_KEY && !isMobile) return children;
+  if (isAdmin(email) && !isMobile) return children;
   return null;
 };
 
