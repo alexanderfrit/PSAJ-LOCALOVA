@@ -40,7 +40,7 @@ const ImageSearchPage = () => {
           <div>
             <h3 className="font-medium text-amber-800">Desktop Only Extension</h3>
             <p className="text-amber-700 text-sm mt-1">
-              This browser extension is designed to work only on desktop computers and is not compatible with mobile devices.
+              The browser extension is designed to work only on desktop computers and is not compatible with mobile devices.
             </p>
           </div>
         </motion.div>
