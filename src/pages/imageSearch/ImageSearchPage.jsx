@@ -23,7 +23,7 @@ const ImageSearchPage = () => {
   const [activeTab, setActiveTab] = useState('search'); // 'search' or 'extension'
 
   // Replace these with your actual links
-  const extensionDownloadUrl = "https://drive.google.com/file/d/19TCx4cOM2mrmlRfm7-OnPkId9xDWvpBj/view?usp=sharing";
+  const extensionDownloadUrl = "https://drive.google.com/uc?export=download&id=19TCx4cOM2mrmlRfm7-OnPkId9xDWvpBj";
   const virusTotalReportUrl = "https://www.virustotal.com/gui/file/3065fd8dc75f2fea0b786a78827a90067f4bc07c82036f8e4d2c4792f54896ec/detection";
   
   return (
