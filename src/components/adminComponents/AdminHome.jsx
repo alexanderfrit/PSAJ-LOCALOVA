@@ -23,24 +23,18 @@ const AdminHome = () => {
 			title: "Total Revenue",
 			count: formatPrice(totalAmount),
 			icon: <RiMoneyDollarCircleLine className="w-8 h-8" />,
-			trend: "+12.5%",
-			trendLabel: "vs last month",
 			bgGradient: "from-primary/10 to-primary/5",
 		},
 		{
 			title: "Products",
 			count: products.length,
 			icon: <RiShoppingBag3Line className="w-8 h-8" />,
-			trend: "+4.3%",
-			trendLabel: "vs last month",
 			bgGradient: "from-secondary/10 to-secondary/5",
 		},
 		{
 			title: "Orders",
 			count: orderHistory.length,
 			icon: <RiFileList3Line className="w-8 h-8" />,
-			trend: "+7.8%",
-			trendLabel: "vs last month",
 			bgGradient: "from-accent/10 to-accent/5",
 		},
 	];
@@ -81,12 +75,6 @@ const AdminHome = () => {
 							<div className="p-3 bg-white/80 backdrop-blur-sm border border-base-300">
 								{card.icon}
 							</div>
-							<div className="flex items-center gap-1 text-success">
-								<RiArrowUpLine className="w-4 h-4" />
-								<span className="text-sm font-medium">
-									{card.trend}
-								</span>
-							</div>
 						</div>
 						<div className="space-y-2">
 							<h3 className="text-neutral/60 text-sm uppercase tracking-wider">
@@ -94,9 +82,6 @@ const AdminHome = () => {
 							</h3>
 							<p className="text-2xl sm:text-3xl font-serif text-neutral">
 								{card.count}
-							</p>
-							<p className="text-xs text-neutral/40">
-								{card.trendLabel}
 							</p>
 						</div>
 					</motion.div>
