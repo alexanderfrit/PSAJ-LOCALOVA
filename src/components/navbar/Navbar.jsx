@@ -176,6 +176,7 @@ const Navbar = () => {
           <div className="hidden lg:flex items-center gap-8">
             <NavLink 
               to="/"
+              end
               className={({ isActive }) => `
                 text-sm font-medium tracking-wider uppercase
                 ${isActive ? 'text-primary' : 'text-neutral hover:text-primary'}
