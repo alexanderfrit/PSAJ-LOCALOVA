@@ -1,7 +1,15 @@
 import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
-   products: localStorage.getItem("product") ? JSON.parse(localStorage.getItem("product")) : [],
+   products: (() => {
+      try {
+         const storedProducts = localStorage.getItem('products');
+         return storedProducts ? JSON.parse(storedProducts) : [];
+      } catch (error) {
+         console.error("Error parsing products from localStorage:", error);
+         return [];
+      }
+   })(),
    minPrice: 0,
    maxPrice: 0,
 };
@@ -11,8 +19,19 @@ const productSlice = createSlice({
    initialState,
    reducers: {
       storeProducts(state, action) {
+         const prices = action.payload.products.map((product) => product.price);
+         const max = Math.max(...prices);
+         const min = Math.min(...prices);
+
          state.products = action.payload.products;
-         localStorage.setItem("product", JSON.stringify(action.payload.products));
+         state.minPrice = min;
+         state.maxPrice = max;
+
+         try {
+            localStorage.setItem('products', JSON.stringify(action.payload.products));
+         } catch (error) {
+            console.error("Error saving products to localStorage:", error);
+         }
       },
       getPriceRange(state, action) {
          const { products } = action.payload;
