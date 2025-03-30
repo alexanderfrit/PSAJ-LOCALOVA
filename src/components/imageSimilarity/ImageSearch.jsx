@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import { RiUpload2Line, RiCloseLine, RiShoppingBag3Line, RiEyeLine } from 'react-icons/ri';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,6 +15,8 @@ const ImageSearch = ({ products }) => {
   const [similarProducts, setSimilarProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
+  const [searchMetrics, setSearchMetrics] = useState(null);
+  const [showMetrics, setShowMetrics] = useState(false);
   const fileInputRef = useRef(null);
   const modelRef = useRef(null);
   const dispatch = useDispatch();
@@ -93,14 +95,18 @@ const ImageSearch = ({ products }) => {
     }
   };
 
-  // Update the handleImageUpload function
+  // Update handleImageUpload to always use enhanced similarity
   const handleImageUpload = useCallback(async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     setIsLoading(true);
     setSimilarProducts([]);
+    setSearchMetrics(null);
     setSelectedImage(URL.createObjectURL(file));
+
+    const startTime = performance.now();
+    let processedProductCount = 0;
 
     try {
       const img = new Image();
@@ -128,7 +134,9 @@ const ImageSearch = ({ products }) => {
             const productFeatures = await extractFeatures(productImg);
             if (!productFeatures) return { product, similarity: 0 };
 
-            const similarity = cosineSimilarity(uploadedFeatures, productFeatures);
+            // Always use enhanced similarity now
+            const similarity = enhancedSimilarity(uploadedFeatures, productFeatures, product.category);
+            processedProductCount++;
             
             // Cleanup the temporary URL
             URL.revokeObjectURL(proxiedUrl);
@@ -141,13 +149,39 @@ const ImageSearch = ({ products }) => {
         })
       );
 
+      // Use improved threshold based on distribution
+      const allSimilarities = similarities.map(item => item.similarity);
+      const meanSimilarity = allSimilarities.reduce((a, b) => a + b, 0) / allSimilarities.length;
+      const stdDev = Math.sqrt(allSimilarities.reduce((sq, n) => sq + Math.pow(n - meanSimilarity, 2), 0) / allSimilarities.length);
+      
+      // Adaptive threshold: use distribution to set cutoff
+      const adaptiveThreshold = meanSimilarity + (0.5 * stdDev);
+      const thresholdToUse = Math.max(0.2, adaptiveThreshold);
+
       const topSimilar = similarities
-        .filter(item => item.similarity > 0.2)
+        .filter(item => item.similarity > thresholdToUse)
         .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 5)
+        .slice(0, 8)
         .map(item => item.product);
 
       setSimilarProducts(topSimilar);
+      
+      // Calculate metrics
+      const endTime = performance.now();
+      const metrics = {
+        searchTime: ((endTime - startTime) / 1000).toFixed(2),
+        resultsCount: topSimilar.length,
+        productsProcessed: processedProductCount,
+        averageSimilarity: topSimilar.length > 0 
+          ? (similarities
+              .filter(s => topSimilar.some(p => p.id === s.product.id))
+              .reduce((sum, item) => sum + item.similarity, 0) / topSimilar.length).toFixed(3)
+          : 0,
+        adaptiveThreshold: thresholdToUse.toFixed(3),
+        categoryCoverage: calculateCategoryCoverage(topSimilar),
+      };
+      
+      setSearchMetrics(metrics);
       
       if (topSimilar.length === 0) {
         toast.info('No similar products found. Try a different image.', toastConfig.info);
@@ -159,6 +193,34 @@ const ImageSearch = ({ products }) => {
       setIsLoading(false);
     }
   }, [products]);
+
+  // New enhanced similarity function that considers product category
+  const enhancedSimilarity = (featuresA, featuresB, category) => {
+    // Base similarity using cosine
+    const baseSimilarity = cosineSimilarity(featuresA, featuresB);
+    
+    // For furniture, visual features in middle layers can be more important
+    // Extract and weight those features more heavily
+    const midLayerStart = Math.floor(featuresA.length * 0.25);
+    const midLayerEnd = Math.floor(featuresA.length * 0.75);
+    
+    const midLayerFeaturesA = featuresA.slice(midLayerStart, midLayerEnd);
+    const midLayerFeaturesB = featuresB.slice(midLayerStart, midLayerEnd);
+    
+    const midLayerSimilarity = cosineSimilarity(midLayerFeaturesA, midLayerFeaturesB);
+    
+    // Combine with more weight on mid-layers (where texture and material features often are)
+    return baseSimilarity * 0.4 + midLayerSimilarity * 0.6;
+  };
+
+  // Calculate category coverage (diversity metric)
+  const calculateCategoryCoverage = (products) => {
+    const categories = new Set();
+    products.forEach(product => {
+      if (product.category) categories.add(product.category);
+    });
+    return categories.size;
+  };
 
   const add2CartFunction = (product) => {
     dispatch(addToCart(product));
@@ -361,6 +423,57 @@ const ImageSearch = ({ products }) => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Search Metrics Panel */}
+        {searchMetrics && similarProducts.length > 0 && (
+          <div className="max-w-2xl mx-auto">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-neutral font-medium">Search Quality Metrics</h3>
+              <button 
+                onClick={() => setShowMetrics(!showMetrics)}
+                className="text-primary text-sm"
+              >
+                {showMetrics ? 'Hide Details' : 'Show Details'}
+              </button>
+            </div>
+            
+            {showMetrics && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-white border border-base-300 p-4 text-sm"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-neutral/60">Search Time</p>
+                    <p className="font-medium">{searchMetrics.searchTime}s</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-neutral/60">Results Found</p>
+                    <p className="font-medium">{searchMetrics.resultsCount}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-neutral/60">Average Similarity</p>
+                    <p className="font-medium">{searchMetrics.averageSimilarity}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-neutral/60">Category Coverage</p>
+                    <p className="font-medium">{searchMetrics.categoryCoverage}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-neutral/60">Adaptive Threshold</p>
+                    <p className="font-medium">{searchMetrics.adaptiveThreshold}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-neutral/60">Products Processed</p>
+                    <p className="font-medium">{searchMetrics.productsProcessed}</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );

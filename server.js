@@ -206,16 +206,101 @@ app.post('/api/create-payment', async (req, res) => {
 	}
 });
 
-// Endpoint for image URL search
+// Enhanced similarity function that weights middle features more heavily
+function enhancedSimilarity(featureA, featureB) {
+	// Basic cosine similarity
+	const baseSimilarity = cosineSimilarity(featureA, featureB);
+	
+	// Extract middle layer features (where texture and material features often are)
+	const midLayerStart = Math.floor(featureA.length * 0.25);
+	const midLayerEnd = Math.floor(featureA.length * 0.75);
+	
+	const midLayerFeaturesA = featureA.slice(midLayerStart, midLayerEnd);
+	const midLayerFeaturesB = featureB.slice(midLayerStart, midLayerEnd);
+	
+	const midLayerSimilarity = cosineSimilarity(midLayerFeaturesA, midLayerFeaturesB);
+	
+	// Weight mid-layers more heavily for furniture
+	return baseSimilarity * 0.4 + midLayerSimilarity * 0.6;
+}
+
+// Updated findSimilarProducts function with adaptive thresholding
+async function findSimilarProducts(products, searchFeatures, limit, threshold) {
+	// Process each product and compute similarity
+	const similarities = await Promise.all(
+		products.map(async (product) => {
+			try {
+				// Get product features
+				let productFeatures;
+				if (product.imageFeatures) {
+					productFeatures = product.imageFeatures;
+				} else {
+					productFeatures = await extractFeaturesFromUrl(product.imageURL);
+				}
+				
+				// Use enhanced similarity calculation
+				const similarity = enhancedSimilarity(searchFeatures, productFeatures);
+				return { product, similarity };
+			} catch (error) {
+				console.error(`Error processing product ${product.id}:`, error);
+				return { product, similarity: 0 };
+			}
+		})
+	);
+	
+	// Calculate adaptive threshold based on distribution
+	const allSimilarities = similarities.map(item => item.similarity);
+	const meanSimilarity = allSimilarities.reduce((a, b) => a + b, 0) / allSimilarities.length;
+	const stdDev = Math.sqrt(
+		allSimilarities.reduce((sq, n) => sq + Math.pow(n - meanSimilarity, 2), 0) / allSimilarities.length
+	);
+	
+	// Use distribution to set cutoff (more adaptive)
+	const adaptiveThreshold = meanSimilarity + (0.5 * stdDev);
+	const thresholdToUse = Math.max(threshold, adaptiveThreshold);
+	
+	// Filter, sort and return results with metrics
+	const results = similarities
+		.filter(item => item.similarity > thresholdToUse)
+		.sort((a, b) => b.similarity - a.similarity)
+		.slice(0, limit);
+		
+	// Calculate category coverage
+	const categories = new Set();
+	results.forEach(item => {
+		if (item.product.category) categories.add(item.product.category);
+	});
+	
+	return {
+		items: results.map(item => ({
+			id: item.product.id,
+			name: item.product.name,
+			price: item.product.price,
+			imageURL: item.product.imageURL,
+			category: item.product.category,
+			productURL: `https://psaj-localova.vercel.app/product-details/${item.product.id}`,
+			similarity: item.similarity.toFixed(3)
+		})),
+		metrics: {
+			averageSimilarity: results.length > 0 
+				? (results.reduce((sum, item) => sum + item.similarity, 0) / results.length).toFixed(3)
+				: 0,
+			adaptiveThreshold: thresholdToUse.toFixed(3),
+			categoryCoverage: categories.size
+		}
+	};
+}
+
+// Update your API endpoints to return the metrics
 app.post('/api/search/url', async (req, res) => {
 	try {
-		const { imageUrl, limit = 5, threshold = 0.2 } = req.body;
+		const { imageUrl, limit = 8, threshold = 0.2 } = req.body;
 		
 		if (!imageUrl) {
 			return res.status(400).json({ error: 'Image URL is required' });
 		}
 		
-		// Get products from your database - FIXED VERSION
+		// Get products from your database
 		const productsCollection = collection(firestore, 'products');
 		const productsSnapshot = await getDocs(productsCollection);
 		const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -223,10 +308,13 @@ app.post('/api/search/url', async (req, res) => {
 		// Extract features from the search image
 		const searchFeatures = await extractFeaturesFromUrl(imageUrl);
 		
-		// Compare with product features (using pre-extracted features if available)
+		// Get results with metrics
 		const results = await findSimilarProducts(products, searchFeatures, limit, threshold);
 		
-		res.json({ results });
+		res.json({ 
+			results: results.items,
+			metrics: results.metrics
+		});
 	} catch (error) {
 		console.error('Error in image search:', error);
 		res.status(500).json({ error: error.message || 'Failed to process image search' });
@@ -259,46 +347,6 @@ app.post('/api/search/upload', upload.single('image'), async (req, res) => {
 		res.status(500).json({ error: error.message || 'Failed to process image search' });
 	}
 });
-
-// Helper function to find similar products
-async function findSimilarProducts(products, searchFeatures, limit, threshold) {
-	// Process each product and compute similarity
-	const similarities = await Promise.all(
-		products.map(async (product) => {
-			try {
-				// Get product features - either from database or extract them
-				let productFeatures;
-				if (product.imageFeatures) {
-					// If you've pre-computed features
-					productFeatures = product.imageFeatures;
-				} else {
-					// Extract them on the fly
-					productFeatures = await extractFeaturesFromUrl(product.imageURL);
-				}
-				
-				const similarity = cosineSimilarity(searchFeatures, productFeatures);
-				return { product, similarity };
-			} catch (error) {
-				console.error(`Error processing product ${product.id}:`, error);
-				return { product, similarity: 0 };
-			}
-		})
-	);
-	
-	// Filter and sort results
-	return similarities
-		.filter(item => item.similarity > threshold)
-		.sort((a, b) => b.similarity - a.similarity)
-		.slice(0, limit)
-		.map(item => ({
-			id: item.product.id,
-			name: item.product.name,
-			price: item.product.price,
-			imageURL: item.product.imageURL,
-			productURL: `https://psaj-localova.vercel.app/product-details/${item.product.id}`,
-			similarity: item.similarity.toFixed(2)
-		}));
-}
 
 // Simple proxy endpoint that doesn't use TensorFlow on server
 app.post('/api/search/url/simple', async (req, res) => {
