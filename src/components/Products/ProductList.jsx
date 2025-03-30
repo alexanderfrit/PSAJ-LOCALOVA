@@ -130,7 +130,7 @@ const ProductList = ({ products }) => {
 									className="w-full py-3 pl-4 pr-12 bg-base-200 border-0 focus:ring-1 focus:ring-primary/20 placeholder:text-neutral/40"
 								/>
 								<span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral/40">
-									<HiOutlineAdjustmentsHorizontal size={20} />
+									
 								</span>
 							</div>
 						</div>
