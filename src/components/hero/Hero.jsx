@@ -47,11 +47,22 @@ const Hero = () => {
   // Scroll animation for parallax grid
   const { scrollYProgress } = useScroll({
     target: parallaxRef,
-    offset: ["start end", "end start"]
+    offset: ["start end", "end start"],
+    smooth: 16
   });
   
-  const leftColumnY = useTransform(scrollYProgress, [0, 1], [0, -200]);
-  const rightColumnY = useTransform(scrollYProgress, [0, 1], [0, 200]);
+  const leftColumnY = useTransform(scrollYProgress, [0, 1], [0, -300]);
+  const rightColumnY = useTransform(scrollYProgress, [0, 1], [0, 300]);
+  
+  // Add smooth scrolling behavior to the entire page
+  useEffect(() => {
+    // Enable smooth scrolling for the document
+    document.documentElement.style.scrollBehavior = 'smooth';
+    
+    return () => {
+      document.documentElement.style.scrollBehavior = 'auto';
+    };
+  }, []);
   
   // Scroll to parallax section
   const scrollToParallax = () => {
@@ -100,7 +111,7 @@ const Hero = () => {
         </div>
 
         {/* Content Container */}
-        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 pt-32 pb-24 lg:pt-40 lg:pb-32">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-12 pt-40 pb-24 lg:pt-40 lg:pb-32">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left Column - Text Content */}
             <div className="space-y-10 lg:pr-8">
@@ -266,7 +277,7 @@ const Hero = () => {
           </div>
         </div>
         
-        {/* Bottom Scroll Indicator with enhanced clickable interaction */}
+        {/* Bottom Scroll Indicator */}
         <motion.div 
           ref={scrollRef}
           initial={{ opacity: 0 }}
@@ -277,10 +288,7 @@ const Hero = () => {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
-          <span className="text-neutral/40 text-sm tracking-widest flex items-center gap-1">
-            SCROLL
-            <RiArrowDownLine className="animate-bounce h-4 w-4" />
-          </span>
+          <RiArrowDownLine className="animate-bounce h-5 w-5 text-neutral/40" />
           <motion.div 
             className="w-0.5 h-10 bg-primary/20"
             animate={{ 
@@ -304,7 +312,7 @@ const Hero = () => {
         {/* Decorative background elements */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-primary/10 to-transparent" />
-          <div className="absolute bottom-0 left-0 w-full h-96 bg-gradient-to-t from-primary/10 to-transparent" />
+          <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-primary/10 to-transparent" />
         </div>
         
         {/* Section title */}
@@ -332,109 +340,115 @@ const Hero = () => {
           </p>
         </div>
         
-        {/* Parallax columns */}
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-hidden">
-          {/* Left Column - Scrolls up */}
-          <motion.div 
-            style={{ y: leftColumnY }}
-            className="space-y-4 md:space-y-6"
-          >
-            {leftColumnProducts.length > 0 ? leftColumnProducts.map((product, index) => (
-              <motion.div
-                key={product.id || index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="group relative overflow-hidden rounded-lg shadow-md shadow-neutral/5"
-                whileHover={{ y: -5 }}
-              >
-                <Link to={`/product-details/${product.id}`}>
-                  <div className="aspect-[4/3] overflow-hidden bg-neutral-100">
-                    <LazyLoadImage
-                      src={product.imageURL}
-                      alt={product.name || "Luxury furniture"}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      effect="blur"
-                      width="100%"
-                      height="100%"
-                    />
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-neutral/80 via-neutral/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute bottom-0 p-4 w-full text-white">
-                      <h3 className="font-medium truncate">{product.name || "Luxury Item"}</h3>
-                      <p className="text-white/80 text-sm">{formatToIDR(product.price || 1000000)}</p>
+        {/* Parallax grid container - ADDED HEIGHT CONSTRAINT */}
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 relative">
+          {/* Grid wrapper with fixed height */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-6 max-h-[800px] sm:max-h-[1000px] md:max-h-[1200px] overflow-hidden">
+            {/* Left Column */}
+            <motion.div 
+              style={{ y: leftColumnY }}
+              className="space-y-6"
+            >
+              {leftColumnProducts.length > 0 ? leftColumnProducts.map((product, index) => (
+                <motion.div
+                  key={product.id || index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="group relative overflow-hidden rounded-lg shadow-md shadow-neutral/5"
+                  whileHover={{ y: -5 }}
+                >
+                  <Link to={`/product-details/${product.id}`}>
+                    <div className="aspect-[4/3] overflow-hidden bg-neutral-100">
+                      <LazyLoadImage
+                        src={product.imageURL}
+                        alt={product.name || "Luxury furniture"}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        effect="blur"
+                        width="100%"
+                        height="100%"
+                      />
                     </div>
-                  </div>
-                </Link>
-              </motion.div>
-            )) : (
-              // Fallback content if no products
-              Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="aspect-[4/3] bg-neutral-100 rounded-lg animate-pulse" />
-              ))
-            )}
-          </motion.div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-neutral/80 via-neutral/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute bottom-0 p-4 w-full text-white">
+                        <h3 className="font-medium truncate">{product.name || "Luxury Item"}</h3>
+                        <p className="text-white/80 text-sm">{formatToIDR(product.price || 1000000)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              )) : (
+                // Fallback content if no products
+                Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="aspect-[4/3] bg-neutral-100 rounded-lg animate-pulse" />
+                ))
+              )}
+            </motion.div>
+            
+            {/* Right Column */}
+            <motion.div 
+              style={{ y: rightColumnY }}
+              className="space-y-6 md:mt-20"
+            >
+              {rightColumnProducts.length > 0 ? rightColumnProducts.map((product, index) => (
+                <motion.div
+                  key={product.id || index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: 0.1 + index * 0.1 }}
+                  className="group relative overflow-hidden rounded-lg shadow-md shadow-neutral/5"
+                  whileHover={{ y: -5 }}
+                >
+                  <Link to={`/product-details/${product.id}`}>
+                    <div className="aspect-[4/3] overflow-hidden bg-neutral-100">
+                      <LazyLoadImage
+                        src={product.imageURL}
+                        alt={product.name || "Luxury furniture"}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        effect="blur"
+                        width="100%"
+                        height="100%"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-neutral/80 via-neutral/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute bottom-0 p-4 w-full text-white">
+                        <h3 className="font-medium truncate">{product.name || "Luxury Item"}</h3>
+                        <p className="text-white/80 text-sm">{formatToIDR(product.price || 1000000)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              )) : (
+                // Fallback content if no products
+                Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="aspect-[4/3] bg-neutral-100 rounded-lg animate-pulse" />
+                ))
+              )}
+            </motion.div>
+          </div>
           
-          {/* Right Column - Scrolls down */}
-          <motion.div 
-            style={{ y: rightColumnY }}
-            className="space-y-4 md:space-y-6 md:mt-20"
+          {/* FIXED: CTA button in separate container with proper spacing */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="text-center mt-20 pt-16 relative z-10"
           >
-            {rightColumnProducts.length > 0 ? rightColumnProducts.map((product, index) => (
-              <motion.div
-                key={product.id || index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.1 + index * 0.1 }}
-                className="group relative overflow-hidden rounded-lg shadow-md shadow-neutral/5"
-                whileHover={{ y: -5 }}
-              >
-                <Link to={`/product-details/${product.id}`}>
-                  <div className="aspect-[4/3] overflow-hidden bg-neutral-100">
-                    <LazyLoadImage
-                      src={product.imageURL}
-                      alt={product.name || "Luxury furniture"}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      effect="blur"
-                      width="100%"
-                      height="100%"
-                    />
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-neutral/80 via-neutral/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute bottom-0 p-4 w-full text-white">
-                      <h3 className="font-medium truncate">{product.name || "Luxury Item"}</h3>
-                      <p className="text-white/80 text-sm">{formatToIDR(product.price || 1000000)}</p>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            )) : (
-              // Fallback content if no products
-              Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="aspect-[4/3] bg-neutral-100 rounded-lg animate-pulse" />
-              ))
-            )}
+            <Link 
+              to="/all"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white hover:bg-primary-focus transition-all duration-300 relative group"
+            >
+              <span>View All Collections</span>
+              <RiArrowRightLine className="transition-transform duration-300 group-hover:translate-x-1" />
+            </Link>
           </motion.div>
         </div>
         
-        {/* Call to action */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-center mt-20"
-        >
-          <Link 
-            to="/all"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white hover:bg-primary-focus transition-all duration-300 relative group"
-          >
-            <span>View All Collections</span>
-            <RiArrowRightLine className="transition-transform duration-300 group-hover:translate-x-1" />
-          </Link>
-        </motion.div>
+        {/* Clear spacer at bottom for extra safety */}
+        <div className="h-24"></div>
       </div>
     </section>
   );

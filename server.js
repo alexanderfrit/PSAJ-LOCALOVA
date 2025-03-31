@@ -52,13 +52,25 @@ let model = null;
 async function loadModel() {
 	if (!model) {
 		try {
-			model = await tf.loadLayersModel(
-				'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json'
+			// Load MobileNet V3 Small model
+			model = await tf.loadGraphModel(
+				'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/default/1',
+				{ fromTFHub: true }
 			);
-			console.log('TensorFlow model loaded successfully');
+			console.log('TensorFlow MobileNet V3 model loaded successfully');
 		} catch (error) {
 			console.error('Error loading TensorFlow model:', error);
-			throw new Error('Failed to load AI model');
+			
+			// Fallback to V1 if needed
+			try {
+				model = await tf.loadLayersModel(
+					'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json'
+				);
+				console.log('Fallback to MobileNet V1 successful');
+			} catch (fallbackError) {
+				console.error('All model loading failed:', fallbackError);
+				throw new Error('Failed to load AI model');
+			}
 		}
 	}
 	return model;
@@ -81,21 +93,16 @@ async function imageToTensor(imageBuffer) {
 		const { data, info } = resizedImageBuffer;
 		const { width, height, channels } = info;
 		
-		// Create tensor directly from raw pixel data
+		// Create tensor with MobileNet V3 normalization: (pixel - 127.5) / 127.5
 		const pixelData = new Float32Array(width * height * channels);
 		
-		// Convert to float32 and normalize
 		for (let i = 0; i < data.length; i++) {
-			pixelData[i] = data[i] / 255.0;
+			pixelData[i] = (data[i] - 127.5) / 127.5;
 		}
 		
-		// Create tensor with proper shape for MobileNet
+		// Create tensor with proper shape
 		const tensor = tf.tensor3d(pixelData, [height, width, channels]);
-		const normalized = tensor.expandDims(0);
-		
-		tensor.dispose(); // Clean up
-		
-		return normalized;
+		return tensor.expandDims(0);
 	} catch (error) {
 		console.error('Error converting image to tensor:', error);
 		throw new Error('Failed to process image');
@@ -211,17 +218,29 @@ function enhancedSimilarity(featureA, featureB) {
 	// Basic cosine similarity
 	const baseSimilarity = cosineSimilarity(featureA, featureB);
 	
-	// Extract middle layer features (where texture and material features often are)
-	const midLayerStart = Math.floor(featureA.length * 0.25);
-	const midLayerEnd = Math.floor(featureA.length * 0.75);
+	// MobileNet V3 has improved feature representations
+	// Extract different parts to weight properly
+	const midLayerStart = Math.floor(featureA.length * 0.3);
+	const midLayerEnd = Math.floor(featureA.length * 0.7);
 	
 	const midLayerFeaturesA = featureA.slice(midLayerStart, midLayerEnd);
 	const midLayerFeaturesB = featureB.slice(midLayerStart, midLayerEnd);
 	
-	const midLayerSimilarity = cosineSimilarity(midLayerFeaturesA, midLayerFeaturesB);
+	// Early features (basic shapes, edges)
+	const earlyFeaturesA = featureA.slice(0, Math.floor(featureA.length * 0.25));
+	const earlyFeaturesB = featureB.slice(0, Math.floor(featureB.length * 0.25));
 	
-	// Weight mid-layers more heavily for furniture
-	return baseSimilarity * 0.4 + midLayerSimilarity * 0.6;
+	// Later features (higher-level concepts)
+	const lateFeaturesA = featureA.slice(Math.floor(featureA.length * 0.75));
+	const lateFeaturesB = featureB.slice(Math.floor(featureB.length * 0.75));
+	
+	const midLayerSimilarity = cosineSimilarity(midLayerFeaturesA, midLayerFeaturesB);
+	const earlyLayerSimilarity = cosineSimilarity(earlyFeaturesA, earlyFeaturesB);
+	const lateLayerSimilarity = cosineSimilarity(lateFeaturesA, lateFeaturesB);
+	
+	// Weight the different feature representations appropriately for furniture
+	return baseSimilarity * 0.2 + midLayerSimilarity * 0.5 + 
+		   earlyLayerSimilarity * 0.1 + lateLayerSimilarity * 0.2;
 }
 
 // Updated findSimilarProducts function with adaptive thresholding

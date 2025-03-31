@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { ListView, GridView, Search, ProductFilter, Pagination } from "../../components";
-import { RiLayoutGridLine, RiListCheck2 } from "react-icons/ri";
+import { RiLayoutGridLine, RiListCheck2, RiSearchLine, RiFilterLine } from "react-icons/ri";
 import { HiOutlineAdjustmentsHorizontal } from "react-icons/hi2";
 import { BiSortAlt2, BiCheck } from "react-icons/bi";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,7 +14,9 @@ const ProductList = ({ products }) => {
 	const [search, setSearch] = useState("");
 	const [sort, setSort] = useState("latest");
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+	const [showMobileSearch, setShowMobileSearch] = useState(false);
 	const dropdownRef = useRef(null);
+	const searchRef = useRef(null);
 	
 	// Pagination
 	const [currentPage, setCurrentPage] = useState(1);
@@ -51,6 +53,9 @@ const ProductList = ({ products }) => {
 			if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
 				setIsDropdownOpen(false);
 			}
+			if (searchRef.current && !searchRef.current.contains(event.target) && showMobileSearch) {
+				setShowMobileSearch(false);
+			}
 		};
 		
 		window.addEventListener("scroll", handleScroll);
@@ -60,7 +65,7 @@ const ProductList = ({ products }) => {
 			window.removeEventListener("scroll", handleScroll);
 			document.removeEventListener("mousedown", handleClickOutside);
 		};
-	}, []);
+	}, [showMobileSearch]);
 
 	const scrollToTop = () => {
 		window.scrollTo({ top: 0, behavior: "smooth" });
@@ -84,18 +89,39 @@ const ProductList = ({ products }) => {
 		>
 			{/* Control Bar */}
 			<div className="bg-white border border-base-300">
-				<div className="p-6 space-y-6">
-					{/* Upper Section */}
-					<div className="flex items-center justify-between border-b border-base-300 pb-6">
-						<div className="flex items-center gap-4">
-							<h2 className="font-serif text-2xl text-neutral">Our Collection</h2>
+				<div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+					{/* Upper Section - Simplified for mobile */}
+					<div className="flex items-center justify-between border-b border-base-300 pb-4 sm:pb-6">
+						<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+							<h2 className="font-serif text-xl sm:text-2xl text-neutral">Our Collection</h2>
 							<span className="text-sm text-neutral/60 font-medium">
 								{filteredProducts.length} Products
 							</span>
 						</div>
 						
-						{/* View Toggle */}
-						<div className="flex items-center gap-2 p-1 bg-base-200">
+						{/* Mobile Action Buttons - Only visible on mobile */}
+						<div className="flex sm:hidden items-center gap-3">
+							{/* Mobile Search Toggle */}
+							<motion.button
+								whileTap={{ scale: 0.95 }}
+								onClick={() => setShowMobileSearch(!showMobileSearch)}
+								className="p-2 bg-base-200 text-neutral/70"
+							>
+								<RiSearchLine size={20} />
+							</motion.button>
+							
+							{/* View Toggle Button - Simpler on mobile */}
+							<motion.button
+								whileTap={{ scale: 0.95 }}
+								onClick={() => setGrid(!grid)}
+								className="p-2 bg-base-200 text-neutral/70"
+							>
+								{grid ? <RiListCheck2 size={20} /> : <RiLayoutGridLine size={20} />}
+							</motion.button>
+						</div>
+						
+						{/* Desktop View Toggle - Hidden on mobile */}
+						<div className="hidden sm:flex items-center gap-2 p-1 bg-base-200">
 							<motion.button
 								whileTap={{ scale: 0.98 }}
 								onClick={() => setGrid(true)}
@@ -117,10 +143,39 @@ const ProductList = ({ products }) => {
 						</div>
 					</div>
 
-					{/* Lower Section */}
-					<div className="flex flex-wrap items-center gap-6">
-						{/* Search */}
-						<div className="flex-1 min-w-[280px]">
+					{/* Mobile Search - Conditional render */}
+					<AnimatePresence>
+						{showMobileSearch && (
+							<motion.div 
+								ref={searchRef}
+								initial={{ height: 0, opacity: 0 }}
+								animate={{ height: 'auto', opacity: 1 }}
+								exit={{ height: 0, opacity: 0 }}
+								className="sm:hidden overflow-hidden"
+							>
+								<div className="pb-4">
+									<div className="relative">
+										<input
+											type="text"
+											value={search}
+											onChange={(e) => setSearch(e.target.value)}
+											placeholder="Search products..."
+											className="w-full py-3 pl-4 pr-12 bg-base-200 border-0 focus:ring-1 focus:ring-primary/20 placeholder:text-neutral/40"
+											autoFocus
+										/>
+										<span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral/40">
+											<RiSearchLine className="w-5 h-5" />
+										</span>
+									</div>
+								</div>
+							</motion.div>
+						)}
+					</AnimatePresence>
+
+					{/* Lower Section - Responsive layout */}
+					<div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+						{/* Desktop Search - Hidden on mobile */}
+						<div className="hidden sm:block sm:flex-1 min-w-[280px]">
 							<div className="relative">
 								<input
 									type="text"
@@ -130,17 +185,17 @@ const ProductList = ({ products }) => {
 									className="w-full py-3 pl-4 pr-12 bg-base-200 border-0 focus:ring-1 focus:ring-primary/20 placeholder:text-neutral/40"
 								/>
 								<span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral/40">
-									
+									<RiSearchLine className="w-5 h-5" />
 								</span>
 							</div>
 						</div>
 
-						{/* Custom Sort Dropdown */}
-						<div className="relative" ref={dropdownRef}>
+						{/* Sort Dropdown - Full width on mobile */}
+						<div className="relative w-full sm:w-auto" ref={dropdownRef}>
 							<motion.button
 								whileTap={{ scale: 0.98 }}
 								onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-								className="flex items-center gap-3 py-3 px-5 bg-base-200 focus:outline-none focus:ring-1 focus:ring-primary/20 min-w-[240px]"
+								className="flex items-center gap-3 py-3 px-5 bg-base-200 focus:outline-none focus:ring-1 focus:ring-primary/20 w-full sm:min-w-[240px]"
 							>
 								<BiSortAlt2 className="text-neutral/60" size={22} />
 								<span className="text-neutral flex-1 text-left">
@@ -194,7 +249,7 @@ const ProductList = ({ products }) => {
 				</div>
 			</div>
 
-			{/* Products Grid/List */}
+			{/* Products Grid/List - Improved for mobile */}
 			<AnimatePresence mode="wait">
 				<motion.div
 					key={grid ? 'grid' : 'list'}
@@ -204,7 +259,9 @@ const ProductList = ({ products }) => {
 					transition={{ duration: 0.3 }}
 				>
 					{grid ? (
-						<GridView products={currentProducts} />
+						<div className="px-0 sm:px-0">
+							<GridView products={currentProducts} />
+						</div>
 					) : (
 						<ListView products={currentProducts} />
 					)}

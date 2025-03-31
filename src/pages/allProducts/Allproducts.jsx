@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Breadcrumbs, ProductFilter, ProductList } from "../../components";
+import { ProductFilter, ProductList } from "../../components";
 import Loader from "../../components/loader/Loader";
 import { RiFilterLine, RiCloseLine } from "react-icons/ri";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,8 +32,7 @@ const Allproducts = () => {
 	return (
 		<>
 			{isLoading && <Loader />}
-			<main className="w-full">
-				<Breadcrumbs />
+			<main className="w-full mt-32">
 				<section className="w-full mx-auto p-4 md:p-10 max-w-[1920px] md:px-6 flex h-full relative">
 					{/* Desktop Filter - Hidden on mobile */}
 					<aside className="hidden sm:block sm:w-72 mx-2">
@@ -50,7 +49,7 @@ const Allproducts = () => {
 						<motion.button
 							whileTap={{ scale: 0.95 }}
 							onClick={() => setIsMobileFilterOpen(true)}
-							className="fixed bottom-8 right-8 z-40 p-4 bg-primary text-white shadow-lg"
+							className="fixed bottom-8 left-8 z-40 p-4 bg-primary text-white shadow-lg"
 						>
 							<RiFilterLine className="w-5 h-5" />
 						</motion.button>
