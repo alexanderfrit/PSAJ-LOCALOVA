@@ -498,9 +498,22 @@ async function processProductImage(productId) {
 			return false;
 		}
 		
-		// Extract features
-		console.log(`Extracting features for product ${productId}: ${product.name}`);
-		const features = await extractFeaturesFromUrl(product.imageURL);
+		// Add retry logic for feature extraction
+		let features = null;
+		let attempts = 0;
+		const maxAttempts = 3;
+		
+		while (!features && attempts < maxAttempts) {
+			try {
+				attempts++;
+				console.log(`Extracting features for product ${productId} (attempt ${attempts}): ${product.name}`);
+				features = await extractFeaturesFromUrl(product.imageURL);
+			} catch (extractError) {
+				console.error(`Error extracting features on attempt ${attempts}:`, extractError);
+				if (attempts >= maxAttempts) throw extractError;
+				await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+			}
+		}
 		
 		// Save features back to Firestore
 		await updateDoc(productRef, {
@@ -540,7 +553,7 @@ function setupProductChangeListeners() {
 				// Only reprocess if the image URL changed or features are missing
 				if (!productData.imageFeatures || 
 					!productData.featureExtractedAt || 
-					(change.doc.data().imageURL !== change.doc.previousData.imageURL)) {
+					(change.doc.previousData && change.doc.data().imageURL !== change.doc.previousData.imageURL)) {
 					console.log(`Modified product detected with changed image: ${productId}`);
 					await processProductImage(productId);
 				}
