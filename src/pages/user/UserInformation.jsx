@@ -84,7 +84,43 @@ const UserInformation = () => {
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists() && userDoc.data().addresses) {
-        const firestoreAddresses = userDoc.data().addresses;
+        let firestoreAddresses = userDoc.data().addresses;
+        
+        // Fix: Ensure only one address is set as default
+        const defaultCount = firestoreAddresses.filter(addr => addr.isDefault).length;
+        if (defaultCount > 1) {
+          // If multiple defaults found, keep only the first as default
+          let foundDefault = false;
+          firestoreAddresses = firestoreAddresses.map(addr => {
+            if (addr.isDefault) {
+              if (foundDefault) {
+                return { ...addr, isDefault: false };
+              }
+              foundDefault = true;
+            }
+            return addr;
+          });
+          
+          // Save the corrected addresses back to Firestore
+          await updateDoc(userDocRef, {
+            addresses: firestoreAddresses,
+            updatedAt: new Date()
+          });
+          
+          console.log("Fixed multiple default addresses");
+        } else if (defaultCount === 0 && firestoreAddresses.length > 0) {
+          // If no default but addresses exist, set the first one as default
+          firestoreAddresses[0].isDefault = true;
+          
+          // Save the corrected addresses back to Firestore
+          await updateDoc(userDocRef, {
+            addresses: firestoreAddresses,
+            updatedAt: new Date()
+          });
+          
+          console.log("Set first address as default");
+        }
+        
         setUserAddresses(firestoreAddresses);
         dispatch(saveUserInformation(firestoreAddresses));
       }
@@ -105,6 +141,28 @@ const UserInformation = () => {
     
     try {
       setIsLoading(true);
+      
+      // Fix: Additional validation to ensure only one default
+      const defaultCount = addresses.filter(addr => addr.isDefault).length;
+      
+      let addressesToSave = [...addresses];
+      if (defaultCount > 1) {
+        // If multiple defaults, keep only the first as default
+        let foundDefault = false;
+        addressesToSave = addresses.map(addr => {
+          if (addr.isDefault) {
+            if (foundDefault) {
+              return { ...addr, isDefault: false };
+            }
+            foundDefault = true;
+          }
+          return addr;
+        });
+      } else if (defaultCount === 0 && addressesToSave.length > 0) {
+        // If no default but addresses exist, set the first one as default
+        addressesToSave[0].isDefault = true;
+      }
+      
       const userDocRef = doc(db, "users", userId);
       
       // Check if user document exists
@@ -114,16 +172,19 @@ const UserInformation = () => {
         // Create a new user document if it doesn't exist
         await setDoc(userDocRef, {
           email,
-          addresses: addresses,
+          addresses: addressesToSave,
           updatedAt: new Date()
         });
       } else {
         // Update existing user document
         await updateDoc(userDocRef, {
-          addresses: addresses,
+          addresses: addressesToSave,
           updatedAt: new Date()
         });
       }
+      
+      // Update local state with validated addresses
+      setUserAddresses(addressesToSave);
       
       toast.success("Addresses saved to your account", toastConfig.success);
     } catch (error) {
