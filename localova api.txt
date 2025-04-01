@@ -1,0 +1,337 @@
+# Localova Visual Search API Documentation
+
+This document provides comprehensive details about the Localova Visual Search API, which powers the visual similarity search functionality for the Localova furniture platform.
+
+## Base URL
+
+psaj-localova-production.up.railway.app
+
+## Authentication
+
+The API now allows access from any origin, making it accessible from any website including Chrome extensions. No additional authentication is required for the search endpoints.
+
+## Key Features
+
+- **Precomputed Image Features**: All product images have their features automatically extracted and stored for rapid searching
+- **Real-time Feature Extraction**: New or modified products automatically have their features processed
+- **Adaptive Thresholding**: Similarity thresholds adjust automatically based on the query image
+- **Enhanced Similarity Algorithm**: Different regions of image features are weighted for better furniture matching
+
+## Search Endpoints
+
+### 1. Search by Image URL
+
+Find visually similar products by providing an image URL.
+
+**Endpoint**: `/api/search/url`
+
+**Method**: POST
+
+**Content-Type**: application/json
+
+**Request Body**:
+
+```json
+{
+  "imageUrl": "https://example.com/path/to/image.jpg",
+  "limit": 8,
+  "threshold": 0.2
+}
+```
+
+**Parameters**:
+
+| Parameter  | Type    | Required | Default | Description |
+|------------|---------|----------|---------|-------------|
+| imageUrl   | string  | Yes      | -       | URL of the image to search for similar products |
+| limit      | number  | No       | 8       | Maximum number of results to return |
+| threshold  | number  | No       | 0.2     | Minimum similarity score (0-1) for results |
+
+**Response**:
+
+```json
+{
+  "results": [
+    {
+      "id": "product123",
+      "name": "Elegant Sofa",
+      "price": 1299.99,
+      "imageURL": "https://example.com/sofa.jpg",
+      "category": "Sofas",
+      "productURL": "https://psaj-localova.vercel.app/product-details/product123",
+      "similarity": "0.875"
+    },
+    // Additional similar products...
+  ],
+  "metrics": {
+    "averageSimilarity": "0.732",
+    "adaptiveThreshold": "0.425",
+    "categoryCoverage": 3
+  }
+}
+```
+
+### 2. Search by Image Upload
+
+Find visually similar products by uploading an image file.
+
+**Endpoint**: `/api/search/upload`
+
+**Method**: POST
+
+**Content-Type**: multipart/form-data
+
+**Request Body**:
+
+| Parameter  | Type    | Required | Description |
+|------------|---------|----------|-------------|
+| image      | file    | Yes      | Image file to upload and search for similar products |
+| limit      | number  | No       | Maximum number of results to return (default: 5) |
+| threshold  | number  | No       | Minimum similarity score (0-1) for results (default: 0.2) |
+
+**Response**:
+
+```json
+{
+  "results": {
+    "items": [
+      {
+        "id": "product456",
+        "name": "Modern Coffee Table",
+        "price": 499.99,
+        "imageURL": "https://example.com/table.jpg",
+        "category": "Tables",
+        "productURL": "https://psaj-localova.vercel.app/product-details/product456",
+        "similarity": "0.812"
+      },
+      // Additional similar products...
+    ],
+    "metrics": {
+      "averageSimilarity": "0.695",
+      "adaptiveThreshold": "0.380",
+      "categoryCoverage": 2
+    }
+  }
+}
+```
+
+### 3. Simple Search by URL (Frontend Processing)
+
+Get all products to process similarity on the frontend. Useful for environments where TensorFlow.js is not available on the server.
+
+**Endpoint**: `/api/search/url/simple`
+
+**Method**: POST
+
+**Content-Type**: application/json
+
+**Request Body**:
+
+```json
+{
+  "imageUrl": "https://example.com/path/to/image.jpg"
+}
+```
+
+**Parameters**:
+
+| Parameter  | Type    | Required | Description |
+|------------|---------|----------|-------------|
+| imageUrl   | string  | Yes      | URL of the image to search for similar products |
+
+**Response**:
+
+```json
+{
+  "imageUrl": "https://example.com/path/to/image.jpg",
+  "products": [
+    {
+      "id": "product789",
+      "name": "Luxury Dining Chair",
+      "price": 349.99,
+      "imageURL": "https://example.com/chair.jpg",
+      "productURL": "https://psaj-localova.vercel.app/product-details/product789"
+    },
+    // Additional products...
+  ]
+}
+```
+
+## Admin Endpoints
+
+The following endpoints are for administrative purposes and should be protected with authentication in a production environment.
+
+### 1. Start Preprocessing Images
+
+Initiate feature extraction for all products that don't already have image features.
+
+**Endpoint**: `/api/admin/preprocess-images`
+
+**Method**: POST
+
+**Response**:
+
+```json
+{
+  "message": "Preprocessing started in background"
+}
+```
+
+### 2. Check Preprocessing Status
+
+Check the current status of the preprocessing job.
+
+**Endpoint**: `/api/admin/preprocess-status`
+
+**Method**: GET
+
+**Response**:
+
+```json
+{
+  "isProcessing": true,
+  "lastProcessedId": "product123"
+}
+```
+
+### 3. Process a Specific Product
+
+Extract and store features for a specific product by ID.
+
+**Endpoint**: `/api/admin/process-product/:productId`
+
+**Method**: POST
+
+**Response (Success)**:
+
+```json
+{
+  "message": "Successfully processed product productXYZ"
+}
+```
+
+**Response (Failure)**:
+
+```json
+{
+  "error": "Failed to process product productXYZ"
+}
+```
+
+## Chrome Extension Integration
+
+### Searching by Selected Area
+
+To implement the "search by selected area" in your Chrome extension, the recommended approach is to use a background script:
+
+#### 1. Content Script (runs on web pages)
+
+```javascript
+// Capture the selected area of the page
+function captureSelectedArea(selectedRect) {
+  // Use browser APIs to capture screenshot
+  chrome.runtime.sendMessage({
+    type: 'CAPTURE_AND_SEARCH',
+    rect: selectedRect
+  }, function(response) {
+    // Handle and display search results
+    showSearchResults(response);
+  });
+}
+```
+
+#### 2. Background Script (runs in extension context)
+
+```javascript
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'CAPTURE_AND_SEARCH') {
+    // Capture the visible area of the tab
+    chrome.tabs.captureVisibleTab(null, {format: 'png'}, (dataUrl) => {
+      // Convert dataUrl to Blob
+      fetch(dataUrl)
+        .then(res => res.blob())
+        .then(blob => {
+          // Create FormData and append the image
+          const formData = new FormData();
+          formData.append('image', blob, 'selected-area.png');
+          
+          // Send to your API
+          return fetch('https://psaj-localova-production.up.railway.app/api/search/upload', {
+            method: 'POST',
+            body: formData
+          });
+        })
+        .then(response => response.json())
+        .then(data => {
+          sendResponse(data);
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          sendResponse({error: error.message});
+        });
+    });
+    
+    return true; // Required for async sendResponse
+  }
+});
+```
+
+This approach ensures your extension works correctly regardless of which website it's used on, as the API requests come from the extension's background context. The server now accepts requests from any origin, so you don't need to worry about CORS issues.
+
+## Error Handling
+
+The API returns appropriate HTTP status codes for different error scenarios:
+
+| Status Code | Description |
+|-------------|-------------|
+| 200         | Success     |
+| 400         | Bad Request - Missing required parameters or invalid input |
+| 500         | Internal Server Error - Server-side processing error |
+
+Error responses follow this format:
+
+```json
+{
+  "error": "Error message describing what went wrong"
+}
+```
+
+## Technical Implementation Details
+
+### Image Processing Pipeline
+
+1. **Feature Extraction**:
+   - Images are resized to 224x224 pixels using Sharp
+   - MobileNet V3 Small model is used for feature extraction (with fallback to V1)
+   - Features are normalized and stored in Firestore with each product
+
+2. **Real-time Updates**:
+   - Firestore listeners automatically detect new or modified products
+   - Image features are extracted in the background without user action
+   - Products are marked with extraction timestamp for tracking
+
+3. **Enhanced Similarity Algorithm**:
+   - Features are weighted by importance for furniture similarity
+   - Middle features: 50% weight (captures furniture style)
+   - Early features: 10% weight (basic shapes and edges)
+   - Late features: 20% weight (higher-level concepts)
+   - Full feature vector: 20% weight (overall appearance)
+
+4. **Adaptive Thresholding**:
+   - Similarity thresholds dynamically adjust based on the distribution of similarities
+   - Provides better results across different types of query images
+
+## Performance Considerations
+
+- All product features are pre-computed and stored for rapid retrieval
+- File size limit for uploads: 5MB
+- Average response time: ~200-500ms (with precomputed features)
+- Memory usage is optimized through tensor disposal after processing
+
+## Support
+
+For technical support or questions about the API, please contact the development team.
+
+---
+
+Last updated: April 2024

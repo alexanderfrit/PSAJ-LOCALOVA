@@ -10,13 +10,16 @@ const fs = require('fs');
 const sharp = require('sharp');
 require('@tensorflow/tfjs-backend-cpu');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, getDocs } = require('firebase/firestore');
+const { getFirestore, collection, getDocs, doc, updateDoc, getDoc, onSnapshot, query, where, orderBy, limit } = require('firebase/firestore');
 
 const app = express();
 
-// CORS configuration
+// CORS configuration to allow requests from any origin
 const corsOptions = {
-	origin: ['https://psaj-localova.vercel.app', 'chrome-extension://gbpokgilgoocimmdflbcfbnehdmmembm']
+	origin: '*',  // Allow all origins
+	methods: ['GET', 'POST', 'OPTIONS'],
+	allowedHeaders: ['Content-Type', 'Authorization'],
+	optionsSuccessStatus: 200
 };
 
 // Apply middlewares
@@ -397,6 +400,219 @@ app.post('/api/search/url/simple', async (req, res) => {
 		res.status(500).json({ error: error.message || 'Failed to process request' });
 	}
 });
+
+// Add a global variable to track preprocessing state
+let isPreprocessing = false;
+let lastProcessedProductId = null;
+
+// Precompute features for all products that don't have them already
+async function preprocessAllProductImages() {
+	// Don't run multiple preprocessing jobs simultaneously
+	if (isPreprocessing) {
+		console.log("Preprocessing already in progress, skipping");
+		return;
+	}
+	
+	try {
+		isPreprocessing = true;
+		console.log("Starting product image preprocessing...");
+		
+		// Get all products
+		const productsCollection = collection(firestore, 'products');
+		const productsSnapshot = await getDocs(productsCollection);
+		const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+		
+		console.log(`Found ${products.length} products to process`);
+		let processedCount = 0;
+		let skippedCount = 0;
+		
+		// Process each product
+		for (const product of products) {
+			try {
+				// Skip if features already exist
+				if (product.imageFeatures && product.imageFeatures.length > 0) {
+					console.log(`Product ${product.id} already has features. Skipping.`);
+					skippedCount++;
+					continue;
+				}
+				
+				if (!product.imageURL) {
+					console.log(`Product ${product.id} has no image URL. Skipping.`);
+					skippedCount++;
+					continue;
+				}
+				
+				// Extract features
+				console.log(`Processing product ${product.id}: ${product.name}`);
+				const features = await extractFeaturesFromUrl(product.imageURL);
+				
+				// Save features back to Firestore
+				const productRef = doc(firestore, 'products', product.id);
+				await updateDoc(productRef, {
+					imageFeatures: features,
+					featureExtractedAt: new Date().toISOString()
+				});
+				
+				// Save the last processed ID to allow for resuming if needed
+				lastProcessedProductId = product.id;
+				
+				processedCount++;
+				console.log(`Successfully processed product ${processedCount}: ${product.name}`);
+				
+				// Add a small delay to avoid overwhelming the server
+				await new Promise(resolve => setTimeout(resolve, 100));
+			} catch (error) {
+				console.error(`Error processing product ${product.id}:`, error);
+			}
+		}
+		
+		console.log(`Preprocessing completed.`);
+		console.log(`- Processed: ${processedCount} products`);
+		console.log(`- Skipped: ${skippedCount} products (already had features)`);
+		console.log(`- Total: ${products.length} products`);
+	} catch (error) {
+		console.error("Error in preprocessing:", error);
+	} finally {
+		isPreprocessing = false;
+	}
+}
+
+// Process a single product
+async function processProductImage(productId) {
+	try {
+		console.log(`Processing single product ${productId}`);
+		
+		// Get the product
+		const productRef = doc(firestore, 'products', productId);
+		const productSnap = await getDoc(productRef);
+		
+		if (!productSnap.exists()) {
+			console.log(`Product ${productId} does not exist`);
+			return false;
+		}
+		
+		const product = productSnap.data();
+		
+		if (!product.imageURL) {
+			console.log(`Product ${productId} has no image URL`);
+			return false;
+		}
+		
+		// Extract features
+		console.log(`Extracting features for product ${productId}: ${product.name}`);
+		const features = await extractFeaturesFromUrl(product.imageURL);
+		
+		// Save features back to Firestore
+		await updateDoc(productRef, {
+			imageFeatures: features,
+			featureExtractedAt: new Date().toISOString()
+		});
+		
+		console.log(`Successfully processed product ${productId}: ${product.name}`);
+		return true;
+	} catch (error) {
+		console.error(`Error processing product ${productId}:`, error);
+		return false;
+	}
+}
+
+// Setup Firestore listeners for product changes
+function setupProductChangeListeners() {
+	const productsCollection = collection(firestore, 'products');
+	
+	// Listen for changes in products
+	onSnapshot(productsCollection, (snapshot) => {
+		snapshot.docChanges().forEach(async (change) => {
+			const productId = change.doc.id;
+			const productData = change.doc.data();
+			
+			// Process new products
+			if (change.type === 'added') {
+				console.log(`New product detected: ${productId}`);
+				// Don't process if it already has features (might be from a restore/import)
+				if (!productData.imageFeatures || productData.imageFeatures.length === 0) {
+					await processProductImage(productId);
+				}
+			}
+			
+			// Process modified products with changed images
+			if (change.type === 'modified') {
+				// Only reprocess if the image URL changed or features are missing
+				if (!productData.imageFeatures || 
+					!productData.featureExtractedAt || 
+					(change.doc.data().imageURL !== change.doc.previousData.imageURL)) {
+					console.log(`Modified product detected with changed image: ${productId}`);
+					await processProductImage(productId);
+				}
+			}
+		});
+	}, 
+	(error) => {
+		console.error("Error in product change listener:", error);
+	});
+	
+	console.log("Product change listeners set up successfully");
+}
+
+// API endpoints for admin to manage preprocessing
+
+// Start preprocessing all products
+app.post('/api/admin/preprocess-images', async (req, res) => {
+	try {
+		// This should be protected with authentication
+		// For example: if (!req.user.isAdmin) return res.status(403).json({error: 'Unauthorized'});
+		
+		// Don't wait for completion - run in background
+		preprocessAllProductImages();
+		res.json({ message: "Preprocessing started in background" });
+	} catch (error) {
+		console.error("Error starting preprocessing:", error);
+		res.status(500).json({ error: error.message });
+	}
+});
+
+// Get preprocessing status
+app.get('/api/admin/preprocess-status', async (req, res) => {
+	try {
+		// This should be protected with authentication
+		res.json({ 
+			isProcessing: isPreprocessing,
+			lastProcessedId: lastProcessedProductId
+		});
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+// Process a single product by ID
+app.post('/api/admin/process-product/:productId', async (req, res) => {
+	try {
+		// This should be protected with authentication
+		const { productId } = req.params;
+		const success = await processProductImage(productId);
+		
+		if (success) {
+			res.json({ message: `Successfully processed product ${productId}` });
+		} else {
+			res.status(400).json({ error: `Failed to process product ${productId}` });
+		}
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
+// Start preprocessing and set up change listeners when server starts
+(async function initializeImageProcessing() {
+	try {
+		// Set up the listeners first
+		setupProductChangeListeners();
+		
+		// Initial preprocessing of all products without features
+		await preprocessAllProductImages();
+	} catch (error) {
+		console.error("Error initializing image processing:", error);
+	}
+})();
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
