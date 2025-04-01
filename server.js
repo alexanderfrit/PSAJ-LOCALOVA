@@ -16,7 +16,15 @@ const app = express();
 
 // CORS configuration
 const corsOptions = {
-	origin: ['https://psaj-localova.vercel.app', 'chrome-extension://gbpokgilgoocimmdflbcfbnehdmmembm']
+	origin: [
+		'https://psaj-localova.vercel.app', 
+		'chrome-extension://gbpokgilgoocimmdflbcfbnehdmmembm',
+		// Add more allowed origins as needed
+	],
+	methods: ['GET', 'POST'],
+	allowedHeaders: ['Content-Type', 'Authorization'],
+	credentials: true,
+	optionsSuccessStatus: 200
 };
 
 // Apply middlewares
@@ -395,6 +403,197 @@ app.post('/api/search/url/simple', async (req, res) => {
 	} catch (error) {
 		console.error('Error in simple image search:', error);
 		res.status(500).json({ error: error.message || 'Failed to process request' });
+	}
+});
+
+// Add timestamp field to track product updates
+const productLastUpdatedTimestamp = {
+	timestamp: Date.now(),
+	productCount: 0
+};
+
+// New endpoint to get all product features
+app.get('/api/products/features', async (req, res) => {
+	try {
+		// Get products from Firestore
+		const productsCollection = collection(firestore, 'products');
+		const productsSnapshot = await getDocs(productsCollection);
+		const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+		
+		// Process all products to extract features if not already available
+		const productsWithFeatures = await Promise.all(
+			products.map(async (product) => {
+				try {
+					// If product already has features, use them
+					if (product.imageFeatures) {
+						return {
+							id: product.id,
+							name: product.name,
+							price: product.price,
+							imageURL: product.imageURL,
+							category: product.category || '',
+							productURL: `https://psaj-localova.vercel.app/product-details/${product.id}`,
+							imageFeatures: product.imageFeatures,
+							updatedAt: product.updatedAt || Date.now(),
+							featureVersion: 'v3' // Mark as MobileNet V3 features
+						};
+					}
+					
+					// Otherwise extract features
+					const features = await extractFeaturesFromUrl(product.imageURL);
+					
+					return {
+						id: product.id,
+						name: product.name,
+						price: product.price,
+						imageURL: product.imageURL,
+						category: product.category || '',
+						productURL: `https://psaj-localova.vercel.app/product-details/${product.id}`,
+						imageFeatures: features,
+						updatedAt: Date.now(),
+						featureVersion: 'v3' // Mark as MobileNet V3 features
+					};
+				} catch (error) {
+					console.error(`Error processing product ${product.id}:`, error);
+					// Return product without features if extraction fails
+					return {
+						id: product.id,
+						name: product.name,
+						price: product.price, 
+						imageURL: product.imageURL,
+						category: product.category || '',
+						productURL: `https://psaj-localova.vercel.app/product-details/${product.id}`,
+						error: 'Feature extraction failed',
+						updatedAt: Date.now()
+					};
+				}
+			})
+		);
+		
+		// Update the timestamp and count
+		productLastUpdatedTimestamp.timestamp = Date.now();
+		productLastUpdatedTimestamp.productCount = productsWithFeatures.length;
+		
+		res.json({
+			products: productsWithFeatures,
+			timestamp: productLastUpdatedTimestamp.timestamp,
+			count: productsWithFeatures.length
+		});
+	} catch (error) {
+		console.error('Error fetching product features:', error);
+		res.status(500).json({ error: error.message || 'Failed to fetch product features' });
+	}
+});
+
+// Endpoint to check for product updates
+app.get('/api/products/check-updates', async (req, res) => {
+	try {
+		const { lastUpdate } = req.query;
+		const clientLastUpdate = parseInt(lastUpdate) || 0;
+		
+		// Get current product count from Firestore
+		const productsCollection = collection(firestore, 'products');
+		const productsSnapshot = await getDocs(productsCollection);
+		const currentProductCount = productsSnapshot.docs.length;
+		
+		// If count changed or it's been more than a day, suggest refresh
+		const countChanged = currentProductCount !== productLastUpdatedTimestamp.productCount;
+		const oneDayInMs = 24 * 60 * 60 * 1000;
+		const timeSinceLastUpdate = Date.now() - productLastUpdatedTimestamp.timestamp;
+		const shouldRefresh = countChanged || timeSinceLastUpdate > oneDayInMs;
+		
+		res.json({
+			lastServerUpdate: productLastUpdatedTimestamp.timestamp,
+			shouldRefresh: shouldRefresh,
+			currentProductCount: currentProductCount,
+			cachedProductCount: productLastUpdatedTimestamp.productCount
+		});
+	} catch (error) {
+		console.error('Error checking product updates:', error);
+		res.status(500).json({ error: error.message || 'Failed to check product updates' });
+	}
+});
+
+// Endpoint to search using already extracted features
+app.post('/api/search/features', async (req, res) => {
+	try {
+		const { features, limit = 8, threshold = 0.2 } = req.body;
+		
+		if (!features || !Array.isArray(features)) {
+			return res.status(400).json({ error: 'Valid feature array is required' });
+		}
+		
+		// Get products from Firestore (for products without cached features)
+		const productsCollection = collection(firestore, 'products');
+		const productsSnapshot = await getDocs(productsCollection);
+		const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+		
+		// Compare query features with all products
+		const similarities = await Promise.all(
+			products.map(async (product) => {
+				try {
+					// Get product features
+					let productFeatures;
+					if (product.imageFeatures) {
+						productFeatures = product.imageFeatures;
+					} else {
+						// If product doesn't have cached features, extract them
+						productFeatures = await extractFeaturesFromUrl(product.imageURL);
+					}
+					
+					// Use enhanced similarity calculation
+					const similarity = enhancedSimilarity(features, productFeatures);
+					return { product, similarity };
+				} catch (error) {
+					console.error(`Error processing product ${product.id}:`, error);
+					return { product, similarity: 0 };
+				}
+			})
+		);
+		
+		// Same filtering and sorting logic as other search endpoints
+		const allSimilarities = similarities.map(item => item.similarity);
+		const meanSimilarity = allSimilarities.reduce((a, b) => a + b, 0) / allSimilarities.length;
+		const stdDev = Math.sqrt(
+			allSimilarities.reduce((sq, n) => sq + Math.pow(n - meanSimilarity, 2), 0) / allSimilarities.length
+		);
+		
+		const adaptiveThreshold = meanSimilarity + (0.5 * stdDev);
+		const thresholdToUse = Math.max(threshold, adaptiveThreshold);
+		
+		const results = similarities
+			.filter(item => item.similarity > thresholdToUse)
+			.sort((a, b) => b.similarity - a.similarity)
+			.slice(0, limit);
+			
+		const categories = new Set();
+		results.forEach(item => {
+			if (item.product.category) categories.add(item.product.category);
+		});
+		
+		res.json({
+			results: {
+				items: results.map(item => ({
+					id: item.product.id,
+					name: item.product.name,
+					price: item.product.price,
+					imageURL: item.product.imageURL,
+					category: item.product.category,
+					productURL: `https://psaj-localova.vercel.app/product-details/${item.product.id}`,
+					similarity: item.similarity.toFixed(3)
+				})),
+				metrics: {
+					averageSimilarity: results.length > 0 
+						? (results.reduce((sum, item) => sum + item.similarity, 0) / results.length).toFixed(3)
+						: 0,
+					adaptiveThreshold: thresholdToUse.toFixed(3),
+					categoryCoverage: categories.size
+				}
+			}
+		});
+	} catch (error) {
+		console.error('Error in feature search:', error);
+		res.status(500).json({ error: error.message || 'Failed to process feature search' });
 	}
 });
 

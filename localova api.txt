@@ -108,11 +108,11 @@ Find visually similar products by uploading an image file.
 }
 ```
 
-### 3. Simple Search by URL (Frontend Processing)
+### 3. Search with Pre-extracted Features
 
-Get all products to process similarity on the frontend. Useful for environments where TensorFlow.js is not available on the server.
+Search for products using pre-extracted image features (for Chrome extension with feature caching).
 
-**Endpoint**: `/api/search/url/simple`
+**Endpoint**: `/api/search/features`
 
 **Method**: POST
 
@@ -122,118 +122,245 @@ Get all products to process similarity on the frontend. Useful for environments 
 
 ```json
 {
-  "imageUrl": "https://example.com/path/to/image.jpg"
+  "features": [0.123, -0.456, 0.789, ...],
+  "limit": 8,
+  "threshold": 0.2
 }
 ```
 
 **Parameters**:
 
-| Parameter  | Type    | Required | Description |
-|------------|---------|----------|-------------|
-| imageUrl   | string  | Yes      | URL of the image to search for similar products |
+| Parameter  | Type    | Required | Default | Description |
+|------------|---------|----------|---------|-------------|
+| features   | array   | Yes      | -       | Array of extracted image features |
+| limit      | number  | No       | 8       | Maximum number of results to return |
+| threshold  | number  | No       | 0.2     | Minimum similarity score (0-1) for results |
+
+**Response**: Same as `/api/search/upload` endpoint.
+
+### 4. Get All Product Features
+
+Retrieve all products with their pre-extracted features (for caching in extension).
+
+**Endpoint**: `/api/products/features`
+
+**Method**: GET
 
 **Response**:
 
 ```json
 {
-  "imageUrl": "https://example.com/path/to/image.jpg",
   "products": [
     {
-      "id": "product789",
-      "name": "Luxury Dining Chair",
-      "price": 349.99,
-      "imageURL": "https://example.com/chair.jpg",
-      "productURL": "https://psaj-localova.vercel.app/product-details/product789"
+      "id": "product123",
+      "name": "Elegant Sofa",
+      "price": 1299.99,
+      "imageURL": "https://example.com/sofa.jpg",
+      "category": "Sofas",
+      "productURL": "https://psaj-localova.vercel.app/product-details/product123",
+      "imageFeatures": [0.123, -0.456, 0.789, ...],
+      "updatedAt": 1695134562000,
+      "featureVersion": "v3"
     },
-    // Additional products...
-  ]
+    // Additional products with features...
+  ],
+  "timestamp": 1695134562000,
+  "count": 128
 }
 ```
 
-## Chrome Extension Integration
+### 5. Check for Product Updates
 
-### Searching by Selected Area
+Check if product data has been updated since last cache.
 
-To implement the "search by selected area" in your Chrome extension, the recommended approach is to use a background script:
+**Endpoint**: `/api/products/check-updates`
 
-#### 1. Content Script (runs on web pages)
+**Method**: GET
 
-```javascript
-// Capture the selected area of the page
-function captureSelectedArea(selectedRect) {
-  // Use browser APIs to capture screenshot
-  chrome.runtime.sendMessage({
-    type: 'CAPTURE_AND_SEARCH',
-    rect: selectedRect
-  }, function(response) {
-    // Handle and display search results
-    showSearchResults(response);
-  });
+**Query Parameters**:
+
+| Parameter  | Type    | Required | Description |
+|------------|---------|----------|-------------|
+| lastUpdate | number  | No       | Timestamp of client's last update |
+
+**Response**:
+
+```json
+{
+  "lastServerUpdate": 1695134562000,
+  "shouldRefresh": true,
+  "currentProductCount": 128,
+  "cachedProductCount": 125
 }
 ```
 
-#### 2. Background Script (runs in extension context)
+## Chrome Extension Integration with Feature Caching
+
+For optimal performance, the Chrome extension should:
+
+1. Pre-extract and cache product features using the `/api/products/features` endpoint
+2. Periodically check for updates with `/api/products/check-updates`
+3. Use the cached features for immediate search results
+
+### Implementation Steps:
+
+#### 1. Pre-extract and Cache Product Features
 
 ```javascript
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'CAPTURE_AND_SEARCH') {
-    // Capture the visible area of the tab
-    chrome.tabs.captureVisibleTab(null, {format: 'png'}, (dataUrl) => {
-      // Convert dataUrl to Blob
-      fetch(dataUrl)
-        .then(res => res.blob())
-        .then(blob => {
-          // Create FormData and append the image
-          const formData = new FormData();
-          formData.append('image', blob, 'selected-area.png');
-          
-          // Send to your API
-          return fetch('https://psaj-localova-production.up.railway.app/api/search/upload', {
-            method: 'POST',
-            body: formData
-          });
-        })
-        .then(response => response.json())
-        .then(data => {
-          sendResponse(data);
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          sendResponse({error: error.message});
-        });
+// In your extension's background script
+async function cacheProductFeatures() {
+  try {
+    // Show loading notification
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icon48.png',
+      title: 'Localova Image Search',
+      message: 'Downloading product features...',
+      priority: 2
     });
     
-    return true; // Required for async sendResponse
+    const response = await fetch('https://psaj-localova-production.up.railway.app/api/products/features');
+    const data = await response.json();
+    
+    // Store in localStorage
+    localStorage.setItem('localova_products', JSON.stringify(data.products));
+    localStorage.setItem('localova_last_update', data.timestamp);
+    
+    // Show success notification
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icon48.png',
+      title: 'Localova Image Search',
+      message: `Successfully cached ${data.count} products for instant search`,
+      priority: 2
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('Error caching product features:', error);
+    
+    // Show error notification
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icon48.png',
+      title: 'Localova Image Search',
+      message: 'Failed to cache product features. Please try again.',
+      priority: 2
+    });
+    
+    throw error;
   }
-});
+}
 ```
 
-This approach ensures your extension works correctly regardless of which website it's used on, as the API requests come from the extension's background context.
-
-1. Capture a screenshot of the selected area using Chrome's `chrome.tabs.captureVisibleTab` API
-2. Convert the screenshot to a Blob or File object
-3. Create a FormData object and append the image file
-4. Send the FormData to the `/api/search/upload` endpoint
-
-**Example Code (JavaScript)**:
+#### 2. Check for Product Updates
 
 ```javascript
-async function searchBySelectedArea(imageBlob) {
-  const formData = new FormData();
-  formData.append('image', imageBlob, 'selected-area.png');
-  
+// In your extension's background script
+async function checkForProductUpdates() {
   try {
-    const response = await fetch('https://your-railway-app-url.railway.app/api/search/upload', {
+    const lastUpdate = localStorage.getItem('localova_last_update') || 0;
+    
+    const response = await fetch(
+      `https://psaj-localova-production.up.railway.app/api/products/check-updates?lastUpdate=${lastUpdate}`
+    );
+    const data = await response.json();
+    
+    if (data.shouldRefresh) {
+      // Show update notification
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icon48.png',
+        title: 'Localova Image Search',
+        message: 'New products available! Click to update your cache.',
+        priority: 2,
+        buttons: [
+          { title: 'Update Now' },
+          { title: 'Later' }
+        ]
+      }, (notificationId) => {
+        // Handle notification click/buttons
+      });
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error checking for product updates:', error);
+    return null;
+  }
+}
+```
+
+#### 3. Search Using Cached Features
+
+```javascript
+// In your extension's content script
+async function searchWithCachedFeatures(imageFeatures) {
+  // First try to use cached products
+  const cachedProducts = JSON.parse(localStorage.getItem('localova_products') || '[]');
+  
+  if (cachedProducts.length > 0) {
+    // Do local search with cached features
+    const results = searchLocalProducts(imageFeatures, cachedProducts);
+    
+    // Immediately show results from local cache
+    showSearchResults(results);
+    
+    // Then check for updates in the background
+    checkForProductUpdates();
+  } else {
+    // If no cached products, fall back to API
+    const formData = new FormData();
+    formData.append('image', imageBlob, 'selected-area.png');
+    
+    const response = await fetch('https://psaj-localova-production.up.railway.app/api/search/upload', {
       method: 'POST',
       body: formData
     });
     
     const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error searching by selected area:', error);
-    throw error;
+    showSearchResults(data.results);
+    
+    // Cache for next time
+    cacheProductFeatures();
   }
+}
+
+// Local search implementation using cached features
+function searchLocalProducts(queryFeatures, products, limit = 8, threshold = 0.2) {
+  // Calculate similarities
+  const similarities = products
+    .map(product => {
+      // Skip products without features
+      if (!product.imageFeatures || product.error) return { product, similarity: 0 };
+      
+      // Calculate similarity with the same algorithm as server
+      const similarity = enhancedSimilarity(queryFeatures, product.imageFeatures);
+      return { product, similarity };
+    })
+    .filter(item => item.similarity > 0);
+  
+  // Calculate adaptive threshold (same as server implementation)
+  const allSimilarities = similarities.map(item => item.similarity);
+  const meanSimilarity = allSimilarities.reduce((a, b) => a + b, 0) / allSimilarities.length;
+  const stdDev = Math.sqrt(
+    allSimilarities.reduce((sq, n) => sq + Math.pow(n - meanSimilarity, 2), 0) / allSimilarities.length
+  );
+  
+  const adaptiveThreshold = meanSimilarity + (0.5 * stdDev);
+  const thresholdToUse = Math.max(threshold, adaptiveThreshold);
+  
+  // Filter, sort and return results
+  const results = similarities
+    .filter(item => item.similarity > thresholdToUse)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, limit)
+    .map(item => ({
+      ...item.product,
+      similarity: item.similarity.toFixed(3)
+    }));
+  
+  return results;
 }
 ```
 
@@ -254,10 +381,6 @@ Error responses follow this format:
   "error": "Error message describing what went wrong"
 }
 ```
-
-## Rate Limiting
-
-There are currently no rate limits implemented, but excessive usage may be monitored and restricted in the future.
 
 ## Technical Details
 
