@@ -6,6 +6,8 @@ import { MdPinDrop } from "react-icons/md";
 import { useDispatch, useSelector } from "react-redux";
 import { saveShippingAddress, saveBillingAddress } from "../../redux/slice/checkoutSlice";
 import { getUserInformation } from "../../redux/slice/userSlice";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../firebase/config";
 import { motion } from "framer-motion";
 import { RiArrowLeftSLine } from "react-icons/ri";
 
@@ -20,22 +22,75 @@ const defaultValues = {
 };
 
 const CheckoutDetails = () => {
-	const { userInfo } = useSelector((store) => store.user);
-	const [shippingAddress, setShippingAddress] = useState(userInfo || defaultValues);
+	const { addresses } = useSelector((store) => store.user);
+	const { isUserLoggedIn, userId } = useSelector((store) => store.auth);
+	const [shippingAddress, setShippingAddress] = useState(defaultValues);
+	const [isLoading, setIsLoading] = useState(false);
 	const dispatch = useDispatch();
 	const navigate = useNavigate();
 
-	// Load user information if available
+	// Load user information if available AND fetch from Firestore directly
 	useEffect(() => {
 		dispatch(getUserInformation());
-	}, [dispatch]);
+		
+		// Fetch addresses directly from Firestore to ensure latest data
+		const fetchUserAddresses = async () => {
+			if (!isUserLoggedIn || !userId) return;
+			
+			try {
+				setIsLoading(true);
+				const userDocRef = doc(db, "users", userId);
+				const userDoc = await getDoc(userDocRef);
+				
+				if (userDoc.exists() && userDoc.data().addresses) {
+					const firestoreAddresses = userDoc.data().addresses;
+					
+					// Find the default address
+					const defaultAddress = firestoreAddresses.find(addr => addr.isDefault);
+					
+					// If there's a default address, use it
+					if (defaultAddress) {
+						setShippingAddress({
+							name: defaultAddress.name || '',
+							line1: defaultAddress.line1 || '',
+							line2: defaultAddress.line2 || '',
+							city: defaultAddress.city || '',
+							pin_code: defaultAddress.pin_code || '',
+							country: defaultAddress.country || '',
+							phone: defaultAddress.phone || '',
+						});
+					}
+				}
+			} catch (error) {
+				console.error("Error fetching user addresses:", error);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+		
+		fetchUserAddresses();
+	}, [dispatch, isUserLoggedIn, userId]);
 
-	// Update form when userInfo changes
+	// Also update form when addresses changes from Redux
 	useEffect(() => {
-		if (userInfo) {
-			setShippingAddress(userInfo);
+		if (addresses && addresses.length > 0) {
+			// Find the default address
+			const defaultAddress = addresses.find(addr => addr.isDefault);
+			
+			// If there's a default address, use it
+			if (defaultAddress) {
+				setShippingAddress({
+					name: defaultAddress.name || '',
+					line1: defaultAddress.line1 || '',
+					line2: defaultAddress.line2 || '',
+					city: defaultAddress.city || '',
+					pin_code: defaultAddress.pin_code || '',
+					country: defaultAddress.country || '',
+					phone: defaultAddress.phone || '',
+				});
+			}
 		}
-	}, [userInfo]);
+	}, [addresses]);
 
 	function handleShipping(e) {
 		const { name, value } = e.target;
