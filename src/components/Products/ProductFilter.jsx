@@ -25,6 +25,20 @@ const ProductFilter = ({ isMobile = false }) => {
 	const [showAllCategories, setShowAllCategories] = useState(false);
 	const [categoryFilter, setCategoryFilter] = useState("");
 
+	// Add temporary input state for price fields
+	const [inputState, setInputState] = useState({
+		min: "",
+		max: ""
+	});
+	
+	// Update inputState when priceRange changes (e.g. from slider)
+	useEffect(() => {
+		setInputState({
+			min: priceRange.min.toString(),
+			max: priceRange.max.toString()
+		});
+	}, [priceRange.min, priceRange.max]);
+
 	// Add this useEffect to properly set the initial price range
 	// and update it whenever min/max price changes in Redux
 	useEffect(() => {
@@ -372,7 +386,7 @@ const ProductFilter = ({ isMobile = false }) => {
 											/>
 										</div>
 										
-										{/* Min thumb - square design */}
+										{/* Min thumb - square design with touch support */}
 										<div
 											className="absolute w-4 h-4 border border-base-300 bg-primary shadow-md cursor-pointer top-0 -mt-1.5 -translate-x-1/2 z-20 hover:brightness-110 transition-all"
 											style={{ left: `${minSliderPosition * 100}%` }}
@@ -402,9 +416,38 @@ const ProductFilter = ({ isMobile = false }) => {
 												document.addEventListener('mousemove', handleMouseMove);
 												document.addEventListener('mouseup', handleMouseUp);
 											}}
+											// Add touch event handlers for mobile
+											onTouchStart={(e) => {
+												e.preventDefault();
+												const touch = e.touches[0];
+												const startX = touch.clientX;
+												const startMin = priceRange.min;
+												const range = maxPrice - minPrice;
+												const sliderWidth = e.target.parentElement.offsetWidth;
+												
+												const handleTouchMove = (moveEvent) => {
+													const touch = moveEvent.touches[0];
+													const deltaX = touch.clientX - startX;
+													const deltaPct = deltaX / sliderWidth;
+													const deltaPrice = deltaPct * range;
+													const newMin = Math.max(
+														minPrice,
+														Math.min(priceRange.max - 1000, startMin + deltaPrice)
+													);
+													setPriceRange(prev => ({ ...prev, min: Number(newMin.toFixed(0)) }));
+												};
+												
+												const handleTouchEnd = () => {
+													document.removeEventListener('touchmove', handleTouchMove);
+													document.removeEventListener('touchend', handleTouchEnd);
+												};
+												
+												document.addEventListener('touchmove', handleTouchMove);
+												document.addEventListener('touchend', handleTouchEnd);
+											}}
 										/>
 										
-										{/* Max thumb - square design */}
+										{/* Max thumb - square design with touch support */}
 										<div
 											className="absolute w-4 h-4 border border-base-300 bg-primary shadow-md cursor-pointer top-0 -mt-1.5 -translate-x-1/2 z-20 hover:brightness-110 transition-all"
 											style={{ left: `${maxSliderPosition * 100}%` }}
@@ -434,6 +477,35 @@ const ProductFilter = ({ isMobile = false }) => {
 												document.addEventListener('mousemove', handleMouseMove);
 												document.addEventListener('mouseup', handleMouseUp);
 											}}
+											// Add touch event handlers for mobile
+											onTouchStart={(e) => {
+												e.preventDefault();
+												const touch = e.touches[0];
+												const startX = touch.clientX;
+												const startMax = priceRange.max;
+												const range = maxPrice - minPrice;
+												const sliderWidth = e.target.parentElement.offsetWidth;
+												
+												const handleTouchMove = (moveEvent) => {
+													const touch = moveEvent.touches[0];
+													const deltaX = touch.clientX - startX;
+													const deltaPct = deltaX / sliderWidth;
+													const deltaPrice = deltaPct * range;
+													const newMax = Math.min(
+														maxPrice,
+														Math.max(priceRange.min + 1000, startMax + deltaPrice)
+													);
+													setPriceRange(prev => ({ ...prev, max: Number(newMax.toFixed(0)) }));
+												};
+												
+												const handleTouchEnd = () => {
+													document.removeEventListener('touchmove', handleTouchMove);
+													document.removeEventListener('touchend', handleTouchEnd);
+												};
+												
+												document.addEventListener('touchmove', handleTouchMove);
+												document.addEventListener('touchend', handleTouchEnd);
+											}}
 										/>
 										
 										{/* Price input fields with luxury styling */}
@@ -441,13 +513,27 @@ const ProductFilter = ({ isMobile = false }) => {
 											<div className="flex-1">
 												<div className="relative">
 													<input
-														type="number"
-														value={priceRange.min}
-														min={minPrice}
-														max={priceRange.max - 1}
+														type="text"
+														value={inputState.min}
 														onChange={(e) => {
-															const value = Math.max(minPrice, Math.min(priceRange.max - 1, Number(e.target.value)));
-															setPriceRange(prev => ({ ...prev, min: value }));
+															// Allow empty or numeric values during typing
+															if (e.target.value === "" || /^\d*$/.test(e.target.value)) {
+																setInputState(prev => ({ ...prev, min: e.target.value }));
+															}
+														}}
+														onBlur={() => {
+															// Apply constraints only when focus is lost
+															if (inputState.min === "") {
+																// If empty, use minimum price
+																setInputState(prev => ({ ...prev, min: minPrice.toString() }));
+																setPriceRange(prev => ({ ...prev, min: minPrice }));
+															} else {
+																// Convert to number and validate
+																const value = Number(inputState.min);
+																const validValue = Math.max(minPrice, Math.min(priceRange.max - 1, value));
+																setInputState(prev => ({ ...prev, min: validValue.toString() }));
+																setPriceRange(prev => ({ ...prev, min: validValue }));
+															}
 														}}
 														className="w-full py-2 px-3 border border-base-300 focus:border-primary focus:outline-none text-neutral bg-white font-medium text-sm"
 													/>
@@ -459,13 +545,27 @@ const ProductFilter = ({ isMobile = false }) => {
 											<div className="flex-1">
 												<div className="relative">
 													<input
-														type="number"
-														value={priceRange.max}
-														min={priceRange.min + 1}
-														max={maxPrice}
+														type="text"
+														value={inputState.max}
 														onChange={(e) => {
-															const value = Math.min(maxPrice, Math.max(priceRange.min + 1, Number(e.target.value)));
-															setPriceRange(prev => ({ ...prev, max: value }));
+															// Allow empty or numeric values during typing
+															if (e.target.value === "" || /^\d*$/.test(e.target.value)) {
+																setInputState(prev => ({ ...prev, max: e.target.value }));
+															}
+														}}
+														onBlur={() => {
+															// Apply constraints only when focus is lost
+															if (inputState.max === "") {
+																// If empty, use maximum price
+																setInputState(prev => ({ ...prev, max: maxPrice.toString() }));
+																setPriceRange(prev => ({ ...prev, max: maxPrice }));
+															} else {
+																// Convert to number and validate
+																const value = Number(inputState.max);
+																const validValue = Math.min(maxPrice, Math.max(priceRange.min + 1, value));
+																setInputState(prev => ({ ...prev, max: validValue.toString() }));
+																setPriceRange(prev => ({ ...prev, max: validValue }));
+															}
 														}}
 														className="w-full py-2 px-3 border border-base-300 focus:border-primary focus:outline-none text-neutral bg-white font-medium text-sm"
 													/>

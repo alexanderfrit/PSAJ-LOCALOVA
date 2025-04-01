@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+give good clear useful commit message on every code change, start with fix, update, etc on every commit message 
