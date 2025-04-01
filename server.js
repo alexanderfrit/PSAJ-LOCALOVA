@@ -16,7 +16,7 @@ const app = express();
 
 // CORS configuration
 const corsOptions = {
-	origin: ['https://psaj-localova.vercel.app', 'chrome-extension://your-extension-id']
+	origin: ['https://psaj-localova.vercel.app', 'chrome-extension://gbpokgilgoocimmdflbcfbnehdmmembm']
 };
 
 // Apply middlewares
