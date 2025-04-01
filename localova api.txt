@@ -8,16 +8,9 @@ psaj-localova-production.up.railway.app
 
 ## Authentication
 
-The API now allows access from any origin, making it accessible from any website including Chrome extensions. No additional authentication is required for the search endpoints.
+Currently, the API uses CORS restrictions to limit access to authorized domains. No additional authentication is required.
 
-## Key Features
-
-- **Precomputed Image Features**: All product images have their features automatically extracted and stored for rapid searching
-- **Real-time Feature Extraction**: New or modified products automatically have their features processed
-- **Adaptive Thresholding**: Similarity thresholds adjust automatically based on the query image
-- **Enhanced Similarity Algorithm**: Different regions of image features are weighted for better furniture matching
-
-## Search Endpoints
+## Endpoints
 
 ### 1. Search by Image URL
 
@@ -157,67 +150,6 @@ Get all products to process similarity on the frontend. Useful for environments 
 }
 ```
 
-## Admin Endpoints
-
-The following endpoints are for administrative purposes and should be protected with authentication in a production environment.
-
-### 1. Start Preprocessing Images
-
-Initiate feature extraction for all products that don't already have image features.
-
-**Endpoint**: `/api/admin/preprocess-images`
-
-**Method**: POST
-
-**Response**:
-
-```json
-{
-  "message": "Preprocessing started in background"
-}
-```
-
-### 2. Check Preprocessing Status
-
-Check the current status of the preprocessing job.
-
-**Endpoint**: `/api/admin/preprocess-status`
-
-**Method**: GET
-
-**Response**:
-
-```json
-{
-  "isProcessing": true,
-  "lastProcessedId": "product123"
-}
-```
-
-### 3. Process a Specific Product
-
-Extract and store features for a specific product by ID.
-
-**Endpoint**: `/api/admin/process-product/:productId`
-
-**Method**: POST
-
-**Response (Success)**:
-
-```json
-{
-  "message": "Successfully processed product productXYZ"
-}
-```
-
-**Response (Failure)**:
-
-```json
-{
-  "error": "Failed to process product productXYZ"
-}
-```
-
 ## Chrome Extension Integration
 
 ### Searching by Selected Area
@@ -276,7 +208,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 ```
 
-This approach ensures your extension works correctly regardless of which website it's used on, as the API requests come from the extension's background context. The server now accepts requests from any origin, so you don't need to worry about CORS issues.
+This approach ensures your extension works correctly regardless of which website it's used on, as the API requests come from the extension's background context.
+
+1. Capture a screenshot of the selected area using Chrome's `chrome.tabs.captureVisibleTab` API
+2. Convert the screenshot to a Blob or File object
+3. Create a FormData object and append the image file
+4. Send the FormData to the `/api/search/upload` endpoint
+
+**Example Code (JavaScript)**:
+
+```javascript
+async function searchBySelectedArea(imageBlob) {
+  const formData = new FormData();
+  formData.append('image', imageBlob, 'selected-area.png');
+  
+  try {
+    const response = await fetch('https://your-railway-app-url.railway.app/api/search/upload', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error searching by selected area:', error);
+    throw error;
+  }
+}
+```
 
 ## Error Handling
 
@@ -296,37 +255,18 @@ Error responses follow this format:
 }
 ```
 
-## Technical Implementation Details
+## Rate Limiting
 
-### Image Processing Pipeline
+There are currently no rate limits implemented, but excessive usage may be monitored and restricted in the future.
 
-1. **Feature Extraction**:
-   - Images are resized to 224x224 pixels using Sharp
-   - MobileNet V3 Small model is used for feature extraction (with fallback to V1)
-   - Features are normalized and stored in Firestore with each product
+## Technical Details
 
-2. **Real-time Updates**:
-   - Firestore listeners automatically detect new or modified products
-   - Image features are extracted in the background without user action
-   - Products are marked with extraction timestamp for tracking
+The API uses TensorFlow.js with MobileNet V3 (with fallback to V1) for feature extraction. Images are processed as follows:
 
-3. **Enhanced Similarity Algorithm**:
-   - Features are weighted by importance for furniture similarity
-   - Middle features: 50% weight (captures furniture style)
-   - Early features: 10% weight (basic shapes and edges)
-   - Late features: 20% weight (higher-level concepts)
-   - Full feature vector: 20% weight (overall appearance)
-
-4. **Adaptive Thresholding**:
-   - Similarity thresholds dynamically adjust based on the distribution of similarities
-   - Provides better results across different types of query images
-
-## Performance Considerations
-
-- All product features are pre-computed and stored for rapid retrieval
-- File size limit for uploads: 5MB
-- Average response time: ~200-500ms (with precomputed features)
-- Memory usage is optimized through tensor disposal after processing
+1. The image is resized to 224x224 pixels
+2. Image features are extracted using the MobileNet model
+3. Similarity is calculated using an enhanced cosine similarity algorithm
+4. Results are filtered based on an adaptive threshold
 
 ## Support
 
@@ -334,4 +274,4 @@ For technical support or questions about the API, please contact the development
 
 ---
 
-Last updated: April 2024
+Last updated: [Current Date]
