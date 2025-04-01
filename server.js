@@ -19,9 +19,9 @@ const corsOptions = {
 	origin: [
 		'https://psaj-localova.vercel.app', 
 		'chrome-extension://gbpokgilgoocimmdflbcfbnehdmmembm',
-		// Add more allowed origins as needed
+		'null'  // For Postman testing
 	],
-	methods: ['GET', 'POST'],
+	methods: ['GET', 'POST', 'OPTIONS'],
 	allowedHeaders: ['Content-Type', 'Authorization'],
 	credentials: true,
 	optionsSuccessStatus: 200
@@ -31,12 +31,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Production setup
-if (process.env.NODE_ENV === "production") {
-	app.use(express.static("build"));
-	app.get("*", (req, res) => {
-		res.sendFile(path.resolve(__dirname, "build", "index.html"));
-	});
+// Only serve static files if the directory exists
+const buildPath = path.join(__dirname, 'build');
+if (fs.existsSync(buildPath)) {
+	app.use(express.static(buildPath));
+} else {
+	console.log('Build directory does not exist, skipping static file serving');
 }
 
 // Create Snap API instance
@@ -414,13 +414,16 @@ const productLastUpdatedTimestamp = {
 
 // New endpoint to get all product features
 app.get('/api/products/features', async (req, res) => {
+	console.log('Request received for /api/products/features');
 	try {
 		// Get products from Firestore
 		const productsCollection = collection(firestore, 'products');
 		const productsSnapshot = await getDocs(productsCollection);
 		const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 		
-		// Process all products to extract features if not already available
+		console.log(`Found ${products.length} products, processing features...`);
+		
+		// Process all products to extract features
 		const productsWithFeatures = await Promise.all(
 			products.map(async (product) => {
 				try {
@@ -435,11 +438,11 @@ app.get('/api/products/features', async (req, res) => {
 							productURL: `https://psaj-localova.vercel.app/product-details/${product.id}`,
 							imageFeatures: product.imageFeatures,
 							updatedAt: product.updatedAt || Date.now(),
-							featureVersion: 'v3' // Mark as MobileNet V3 features
+							featureVersion: 'v3'
 						};
 					}
 					
-					// Otherwise extract features
+					// Extract features for products without them
 					const features = await extractFeaturesFromUrl(product.imageURL);
 					
 					return {
@@ -451,11 +454,10 @@ app.get('/api/products/features', async (req, res) => {
 						productURL: `https://psaj-localova.vercel.app/product-details/${product.id}`,
 						imageFeatures: features,
 						updatedAt: Date.now(),
-						featureVersion: 'v3' // Mark as MobileNet V3 features
+						featureVersion: 'v3'
 					};
 				} catch (error) {
 					console.error(`Error processing product ${product.id}:`, error);
-					// Return product without features if extraction fails
 					return {
 						id: product.id,
 						name: product.name,
@@ -474,6 +476,8 @@ app.get('/api/products/features', async (req, res) => {
 		productLastUpdatedTimestamp.timestamp = Date.now();
 		productLastUpdatedTimestamp.productCount = productsWithFeatures.length;
 		
+		console.log(`Returning ${productsWithFeatures.length} products with features`);
+		
 		res.json({
 			products: productsWithFeatures,
 			timestamp: productLastUpdatedTimestamp.timestamp,
@@ -487,6 +491,7 @@ app.get('/api/products/features', async (req, res) => {
 
 // Endpoint to check for product updates
 app.get('/api/products/check-updates', async (req, res) => {
+	console.log('Request received for /api/products/check-updates');
 	try {
 		const { lastUpdate } = req.query;
 		const clientLastUpdate = parseInt(lastUpdate) || 0;
@@ -516,6 +521,7 @@ app.get('/api/products/check-updates', async (req, res) => {
 
 // Endpoint to search using already extracted features
 app.post('/api/search/features', async (req, res) => {
+	console.log('Request received for /api/search/features');
 	try {
 		const { features, limit = 8, threshold = 0.2 } = req.body;
 		
@@ -523,7 +529,7 @@ app.post('/api/search/features', async (req, res) => {
 			return res.status(400).json({ error: 'Valid feature array is required' });
 		}
 		
-		// Get products from Firestore (for products without cached features)
+		// Get products from Firestore
 		const productsCollection = collection(firestore, 'products');
 		const productsSnapshot = await getDocs(productsCollection);
 		const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -594,6 +600,40 @@ app.post('/api/search/features', async (req, res) => {
 	} catch (error) {
 		console.error('Error in feature search:', error);
 		res.status(500).json({ error: error.message || 'Failed to process feature search' });
+	}
+});
+
+// Add this near your other route definitions
+app.get('/api/health', (req, res) => {
+	console.log('Health check endpoint called');
+	res.json({ 
+		status: 'ok', 
+		timestamp: new Date().toISOString(),
+		routes: [
+			'/api/search/url',
+			'/api/search/upload',
+			'/api/search/features',
+			'/api/products/features',
+			'/api/products/check-updates'
+		],
+		environment: process.env.NODE_ENV || 'development'
+	});
+});
+
+// Make sure your catch-all route is at the end (if you have one)
+// Only use this if you're serving a frontend app and need to handle client-side routing
+app.get('*', (req, res) => {
+	// Check if the request is for an API route
+	if (req.path.startsWith('/api/')) {
+		return res.status(404).json({ error: 'API endpoint not found' });
+	}
+	
+	// For other routes, try to serve index.html if it exists
+	const indexPath = path.join(__dirname, 'build', 'index.html');
+	if (fs.existsSync(indexPath)) {
+		res.sendFile(indexPath);
+	} else {
+		res.status(404).send('Not found - This server primarily handles API requests');
 	}
 });
 
