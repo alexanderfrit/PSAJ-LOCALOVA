@@ -19,6 +19,7 @@ const corsOptions = {
 	origin: [
 		'https://psaj-localova.vercel.app', 
 		'chrome-extension://gbpokgilgoocimmdflbcfbnehdmmembm',
+		'chrome-extension://eldiljabeolickahhfkllglnhhpecjce',
 		'null'  // For Postman testing
 	],
 	methods: ['GET', 'POST', 'OPTIONS'],
